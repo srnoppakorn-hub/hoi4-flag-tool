@@ -1,0 +1,2745 @@
+<!DOCTYPE html>
+<!--
+  HOI4 Flag Tool
+  SPDX-License-Identifier: MIT
+
+  Copyright (c) 2026 Firemask animation 2.3
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Firemask animation 2.3">
+<!-- ล็อกหน้านี้ไม่ให้โหลดหรือส่งอะไรออกไปนอกเครื่อง: ไม่มีสคริปต์ภายนอก ไม่มีการเชื่อมต่อเครือข่าย -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; base-uri 'none'; form-action 'none'">
+<title>HOI4 Flags: resize and convert to TGA</title>
+<style>
+:root {
+  --bg: #1b2527;
+  --panel: #233134;
+  --panel-2: #2b3b3f;
+  --line: #3b4f53;
+  --text: #e6dec6;
+  --muted: #9eaba3;
+  --brass: #c9a65b;
+  --brass-dk: #7f6a3a;
+  --red: #e08a7c;
+  --chk1: #3a4a4d;
+  --chk2: #2c393c;
+  --font: "Bahnschrift", "DIN Alternate", "Leelawadee UI", "Noto Sans Thai", "Thonburi", Tahoma, sans-serif;
+  --code: Consolas, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+code { font-family: var(--code); font-size: .88em; color: var(--text); }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 48px; }
+
+/* ตัวเลือกภาษา */
+.langbar {
+  display: flex; justify-content: flex-end; align-items: center; gap: 8px;
+  margin: -16px 0 16px; font-size: .9rem; color: var(--muted);
+}
+.langbar label { display: inline-flex; align-items: center; gap: 6px; }
+.langbar svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.langbar select {
+  min-height: 34px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--panel); color: var(--text); font: inherit; cursor: pointer;
+}
+html:lang(zh-CN) { --font: "Bahnschrift", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "Noto Sans CJK SC", sans-serif; }
+html:lang(ja) { --font: "Bahnschrift", "Yu Gothic UI", "Meiryo UI", "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", sans-serif; }
+
+/* หัวหน้า */
+.top {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 24px; padding-bottom: 24px; border-bottom: 2px solid var(--brass-dk);
+}
+h1 {
+  margin: 0; font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05;
+  font-weight: 700; font-stretch: 80%;
+}
+.lede { margin: .7rem 0 0; max-width: 44ch; color: var(--muted); font-size: 1.05rem; }
+.sizes { color: var(--brass); flex: none; max-width: 100%; height: auto; }
+.local {
+  margin: 20px 0 0; padding: 2px 0 2px 14px; border-left: 3px solid var(--brass-dk);
+  color: var(--muted); font-size: .92rem; max-width: 70ch;
+}
+
+/* ส่วนเพิ่มรูปและตั้งค่า */
+.setup { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; margin-top: 32px; }
+.drop {
+  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  padding: 32px 28px; border: 2px dashed var(--line); border-radius: 6px; background: var(--panel);
+  transition: border-color .15s, background-color .15s;
+}
+body.dragging .drop { border-color: var(--brass); background: var(--panel-2); }
+.drop h2 { margin: 0; font-size: 1.4rem; line-height: 1.3; }
+.hint { margin: 0; color: var(--muted); font-size: .92rem; max-width: 52ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+
+.settings { display: grid; gap: 22px; align-content: start; }
+fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 8px; font-weight: 700; }
+.choice { display: grid; gap: 6px; }
+.opt {
+  display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--panel);
+}
+.opt:has(input:checked) { border-color: var(--brass); background: var(--panel-2); }
+.opt input { accent-color: var(--brass); margin: .4em 0 0; flex: none; }
+.opt small { display: block; color: var(--muted); font-size: .85rem; line-height: 1.45; }
+
+/* ปุ่ม */
+.btn {
+  font: inherit; font-weight: 700; padding: 9px 18px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--brass); background: transparent; color: var(--text);
+}
+.btn:hover { background: rgba(201, 166, 91, .12); }
+.btn-primary { background: var(--brass); color: #211c10; }
+.btn-primary:hover { background: #d8b76c; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--brass); }
+.link {
+  font: inherit; font-size: .92rem; padding: 4px 2px; border: 0; background: none;
+  color: var(--muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.link:hover { color: var(--text); }
+
+/* รายการธง */
+.list-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 24px; margin: 44px 0 12px; }
+.list-head h2 { margin: 0; font-size: 1.4rem; }
+#flags { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.flag {
+  display: grid; grid-template-columns: minmax(200px, 1fr) auto auto;
+  grid-template-areas: "name previews actions";
+  gap: 18px 32px; align-items: center; padding: 20px 6px; border-bottom: 1px solid var(--line);
+}
+.flag.has-err { box-shadow: inset 3px 0 0 var(--red); padding-left: 16px; }
+.flag-name { grid-area: name; min-width: 0; }
+.fields { display: flex; flex-wrap: wrap; gap: 10px 12px; }
+.field label { display: block; margin-bottom: 4px; font-size: .85rem; color: var(--muted); }
+.field input, .field select, .bulk select {
+  min-height: 40px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--bg); color: var(--text); font: inherit;
+}
+.field input { width: 8.5em; font-size: 1.15rem; font-weight: 700; }
+.field input:focus { border-color: var(--brass); outline: none; }
+.field select, .bulk select { font-size: .95rem; cursor: pointer; }
+.flag.has-err .field input { border-color: var(--red); }
+.out-name { margin: 10px 0 0; font-size: .92rem; color: var(--muted); overflow-wrap: anywhere; }
+.out-name strong { color: var(--text); font-size: 1.05rem; }
+.meta { margin: 2px 0 0; font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: .92rem; }
+.bulk label { color: var(--muted); }
+.bulk select { min-height: 36px; padding: 4px 8px; }
+.btn-small { padding: 5px 12px; font-size: .92rem; }
+.err { margin: 6px 0 0; font-size: .9rem; color: var(--red); }
+
+.previews { grid-area: previews; display: flex; align-items: flex-end; gap: 20px; }
+.pv { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.box {
+  line-height: 0;
+  background: conic-gradient(var(--chk1) 25%, var(--chk2) 0 50%, var(--chk1) 0 75%, var(--chk2) 0) 0 0 / 8px 8px;
+}
+.pv-large .box { outline: 2px solid var(--brass-dk); }
+.box canvas { display: block; image-rendering: pixelated; }
+.pv figcaption { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row-actions { grid-area: actions; display: flex; flex-direction: column; gap: 8px; }
+.edited { margin: 6px 0 0; font-size: .85rem; color: var(--brass); }
+.fs-note { margin-top: 8px; font-size: .85rem; }
+
+.empty { margin: 0; padding: 28px 6px; color: var(--muted); border-bottom: 1px solid var(--line); }
+
+/* วิธีใช้ */
+.guide { margin-top: 32px; max-width: 72ch; }
+.guide summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
+.guide p { margin: 10px 0 0; color: var(--muted); }
+
+/* สัญญาอนุญาต (โอเพนซอร์ส) */
+.legal { max-width: 72ch; margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); }
+.legal p { margin: 4px 0 0; font-size: .88rem; color: var(--muted); }
+.legal p:first-child { color: var(--text); }
+
+/* แถบดาวน์โหลดด้านล่าง */
+.bar { position: sticky; bottom: 0; background: var(--panel); border-top: 2px solid var(--brass-dk); }
+.bar .inner {
+  max-width: 1040px; margin: 0 auto; padding: 14px 24px;
+  display: flex; align-items: center; gap: 12px 20px; flex-wrap: wrap;
+}
+#count { font-weight: 700; font-variant-numeric: tabular-nums; }
+#status { flex: 1; min-width: 180px; font-size: .9rem; color: var(--muted); }
+#status.is-err { color: var(--red); }
+
+@media (max-width: 760px) {
+  .setup { grid-template-columns: 1fr; }
+  .sizes { width: 200px; }
+}
+@media (max-width: 600px) {
+  .wrap { padding: 28px 16px 40px; }
+  .flag { grid-template-columns: 1fr auto; grid-template-areas: "name actions" "previews previews"; gap: 16px; }
+  .previews { gap: 16px; flex-wrap: wrap; }
+  .bar .inner { padding: 12px 16px; }
+}
+/* หน้าแก้ไขเลเยอร์ */
+dialog.editor {
+  width: min(1220px, 96vw); max-width: 96vw; max-height: 94vh; padding: 0;
+  border: 1px solid var(--brass-dk); border-radius: 6px; background: var(--bg); color: var(--text);
+}
+dialog.editor::backdrop { background: rgba(10, 14, 15, .75); }
+.ed { display: flex; flex-direction: column; max-height: 94vh; }
+.ed-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px 12px 20px; border-bottom: 1px solid var(--line);
+}
+.ed-head h2 { margin: 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+.ed-body {
+  display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 20px;
+  padding: 16px 20px; overflow: auto; min-height: 0;
+}
+.ed-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-bottom: 10px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.ed-stage-wrap {
+  position: relative; display: flex; justify-content: center;
+  border: 1px solid var(--line); border-radius: 4px; background: #151d1f;
+}
+.zoombar {
+  position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 2px; padding: 3px;
+  border: 1px solid var(--line); border-radius: 6px; background: rgba(27, 37, 39, .92);
+}
+.zoombar output { min-width: 3.4em; text-align: center; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.zoom-fit {
+  padding: 5px 9px; border: 0; border-radius: 4px; background: none; color: var(--muted);
+  font: inherit; font-size: .82rem; cursor: pointer;
+}
+.zoom-fit:hover { color: var(--text); background: rgba(201, 166, 91, .12); }
+body.dragging dialog[open] .ed-stage-wrap { outline: 2px dashed var(--brass); outline-offset: 3px; }
+#ed-stage { display: block; max-width: 100%; max-height: 50vh; width: auto; height: auto; touch-action: none; }
+#ed-stage:focus { outline: none; }
+#ed-stage:focus-visible { outline: 2px solid var(--brass); outline-offset: -2px; }
+.ed-hint { margin: 8px 0 0; font-size: .84rem; line-height: 1.5; color: var(--muted); max-width: 90ch; }
+.ed-previews { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px; margin-top: 14px; }
+.ed-side { display: grid; gap: 20px; align-content: start; min-width: 0; }
+.ed-side h3 { margin: 0 0 8px; font-size: 1rem; }
+.ed-side h3 .sub { font-weight: 400; font-size: .82rem; color: var(--muted); margin-left: 6px; }
+#ed-layers {
+  list-style: none; margin: 0; padding: 0; max-height: 236px; overflow: auto;
+  border: 1px solid var(--line); border-radius: 4px;
+}
+.layer { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--line); }
+.layer:last-child { border-bottom: 0; }
+.layer.is-sel { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--brass); }
+.layer-pick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px 4px 6px 10px;
+  border: 0; background: none; color: inherit; font: inherit; font-size: .92rem; text-align: left; cursor: pointer;
+}
+.layer-pick span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-pick canvas {
+  flex: none; width: 55px; height: 35px; outline: 1px solid var(--line);
+  background: conic-gradient(var(--chk1) 25%, var(--chk2) 0 50%, var(--chk1) 0 75%, var(--chk2) 0) 0 0 / 8px 8px;
+}
+.layer.is-hidden .layer-pick { opacity: .45; }
+.layer-tools { display: flex; flex: none; padding-right: 4px; }
+.btn-icon {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer;
+}
+.btn-icon:hover:not(:disabled) { color: var(--text); background: rgba(201, 166, 91, .12); }
+.btn-icon:disabled { opacity: .3; cursor: default; }
+.btn-icon svg {
+  width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.props { display: grid; gap: 12px; }
+.sel-name { margin: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.prop label, .prop-label { display: block; margin-bottom: 4px; font-size: .82rem; color: var(--muted); }
+.prop input[type=number] {
+  width: 100%; min-height: 36px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px;
+  background: var(--bg); color: var(--text); font: inherit; font-variant-numeric: tabular-nums;
+}
+.prop input[type=number]:focus { border-color: var(--brass); outline: none; }
+.prop input[type=range] { width: 100%; accent-color: var(--brass); }
+.prop input[type=color] {
+  width: 64px; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg);
+}
+.check { display: flex; align-items: center; gap: 8px; font-size: .92rem; cursor: pointer; }
+.check input { accent-color: var(--brass); width: 16px; height: 16px; }
+.ed-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 12px;
+  padding: 12px 20px; border-top: 1px solid var(--line);
+}
+#ed-status { flex: 1; min-width: 180px; font-size: .88rem; color: var(--muted); }
+#ed-status.is-err { color: var(--red); }
+@media (max-width: 880px) {
+  .ed-body { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  dialog.editor { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .ed { height: 100%; max-height: 100dvh; }
+  .ed-body { padding: 12px; }
+  #ed-stage { max-height: 46vh; }
+  #ed-status { flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="langbar">
+    <label for="lang-select">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.8 3.9 5.8 3.9 9s-1.3 6.2-3.9 9c-2.6-2.8-3.9-5.8-3.9-9S9.4 5.8 12 3z"/></svg>
+      <span data-i18n="lang.label"></span>
+    </label>
+    <select id="lang-select"></select>
+  </div>
+
+  <header class="top">
+    <div>
+      <h1 data-i18n="h1"></h1>
+      <p class="lede" data-i18n-html="lede"></p>
+    </div>
+    <svg class="sizes" viewBox="0 0 262 108" width="262" height="108" role="img" data-i18n-aria="sizes.aria">
+      <g fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="1" y="1" width="131" height="83" fill="currentColor" fill-opacity=".08"/>
+        <rect x="150" y="42" width="66" height="42" fill="currentColor" fill-opacity=".08"/>
+        <rect x="236" y="73" width="16" height="11" fill="currentColor" fill-opacity=".08"/>
+      </g>
+      <g fill="currentColor" font-size="13" text-anchor="middle" font-family="Bahnschrift, 'DIN Alternate', Tahoma, sans-serif">
+        <text x="66.5" y="104">82×52</text>
+        <text x="183" y="104">41×26</text>
+        <text x="244" y="104">10×7</text>
+      </g>
+    </svg>
+  </header>
+
+  <p class="local" data-i18n="local"></p>
+
+  <section class="setup">
+    <div class="drop" id="drop">
+      <h2 data-i18n="drop.title"></h2>
+      <p class="hint" data-i18n="drop.hint"></p>
+      <div class="actions">
+        <button type="button" class="btn btn-primary" id="btn-files" data-i18n="btn.files"></button>
+        <button type="button" class="btn" id="btn-folder" data-i18n="btn.folder"></button>
+      </div>
+      <input type="file" id="pick-files" accept="image/*,.tga" multiple hidden>
+      <input type="file" id="pick-folder" webkitdirectory multiple hidden>
+    </div>
+
+    <div class="settings">
+      <fieldset>
+        <legend data-i18n="mode.legend"></legend>
+        <div class="choice">
+          <label class="opt"><input type="radio" name="mode" value="stretch" checked><span><span data-i18n="mode.stretch"></span><small data-i18n="mode.stretch.sub"></small></span></label>
+          <label class="opt"><input type="radio" name="mode" value="cover"><span><span data-i18n="mode.cover"></span><small data-i18n="mode.cover.sub"></small></span></label>
+          <label class="opt"><input type="radio" name="mode" value="contain"><span><span data-i18n="mode.contain"></span><small data-i18n="mode.contain.sub"></small></span></label>
+        </div>
+        <p class="hint fs-note" data-i18n="mode.note"></p>
+      </fieldset>
+      <fieldset>
+        <legend data-i18n="layout.legend"></legend>
+        <div class="choice">
+          <label class="opt"><input type="radio" name="layout" value="mod" checked><span><span data-i18n="layout.mod"></span><small data-i18n-html="layout.mod.sub"></small></span></label>
+          <label class="opt"><input type="radio" name="layout" value="split"><span><span data-i18n="layout.split"></span><small data-i18n-html="layout.split.sub"></small></span></label>
+        </div>
+      </fieldset>
+    </div>
+  </section>
+
+  <section>
+    <div class="list-head">
+      <h2 data-i18n="list.title"></h2>
+      <div class="bulk" id="bulk" hidden>
+        <label for="bulk-ideo" data-i18n="bulk.label"></label>
+        <select id="bulk-ideo" class="ideo-select"></select>
+        <button type="button" class="btn btn-small" id="bulk-apply" data-i18n="bulk.apply"></button>
+        <button type="button" class="link" id="clear" data-i18n="bulk.clear"></button>
+      </div>
+    </div>
+    <ul id="flags"></ul>
+    <p class="empty" id="empty" data-i18n="list.empty"></p>
+  </section>
+
+  <details class="guide">
+    <summary data-i18n="guide.summary"></summary>
+    <p data-i18n="guide.p1"></p>
+    <p data-i18n-html="guide.p2"></p>
+    <p data-i18n-html="guide.p3"></p>
+    <p data-i18n-html="guide.p4"></p>
+    <p data-i18n-html="guide.p5"></p>
+  </details>
+
+  <footer class="legal">
+    <p data-i18n="legal.oss"></p>
+    <p data-i18n="legal.note"></p>
+  </footer>
+</div>
+
+<div class="bar">
+  <div class="inner">
+    <span id="count"></span>
+    <span id="status" role="status" aria-live="polite"></span>
+    <button type="button" class="btn btn-primary" id="download" disabled data-i18n="download"></button>
+  </div>
+</div>
+
+<dialog class="editor" id="editor" aria-labelledby="ed-title">
+  <div class="ed">
+    <header class="ed-head">
+      <h2 id="ed-title"></h2>
+      <button type="button" class="btn-icon" id="ed-close" data-i18n-aria="ed.close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </header>
+    <div class="ed-body">
+      <div class="ed-main">
+        <div class="ed-toolbar">
+          <div class="btn-row">
+            <button type="button" class="btn btn-small" id="ed-add-img" data-i18n="ed.addImg"></button>
+            <button type="button" class="btn btn-small" id="ed-add-rect" data-i18n="ed.addRect"></button>
+            <button type="button" class="btn btn-small" id="ed-add-ellipse" data-i18n="ed.addEllipse"></button>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn-small" id="ed-undo" title="Ctrl+Z" data-i18n="ed.undo"></button>
+            <button type="button" class="btn btn-small" id="ed-redo" title="Ctrl+Y" data-i18n="ed.redo"></button>
+            <button type="button" class="btn btn-small" id="ed-reset" data-i18n="ed.reset"></button>
+          </div>
+          <input type="file" id="ed-pick" accept="image/*,.tga" multiple hidden>
+        </div>
+        <div class="ed-stage-wrap">
+          <canvas id="ed-stage" tabindex="0" data-i18n-aria="ed.stageAria"></canvas>
+          <div class="zoombar" role="group" data-i18n-aria="ed.zoomGroup">
+            <button type="button" class="btn-icon" id="ed-zoom-out" data-i18n-aria="ed.zoomOut"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
+            <output id="ed-zoom-pct">100%</output>
+            <button type="button" class="btn-icon" id="ed-zoom-in" data-i18n-aria="ed.zoomIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12M12 6v12"/></svg></button>
+            <button type="button" class="zoom-fit" id="ed-zoom-fit" data-i18n="ed.zoomFit"></button>
+          </div>
+        </div>
+        <p class="ed-hint" data-i18n="ed.hint"></p>
+        <p class="ed-hint" data-i18n="ed.zoomHint"></p>
+        <div class="ed-previews" id="ed-previews"></div>
+      </div>
+      <aside class="ed-side">
+        <section>
+          <h3><span data-i18n="ed.layers"></span><span class="sub" data-i18n="ed.layersSub"></span></h3>
+          <ol id="ed-layers"></ol>
+        </section>
+        <section class="props">
+          <h3 data-i18n="ed.selected"></h3>
+          <p class="hint" id="ed-noselect" data-i18n="ed.noselect"></p>
+          <div class="props" id="ed-propfields" hidden>
+            <p class="sel-name" id="ed-sel-name"></p>
+            <div class="prop-grid">
+              <div class="prop"><label for="ed-x" data-i18n="ed.x"></label><input id="ed-x" type="number" step="0.5"></div>
+              <div class="prop"><label for="ed-y" data-i18n="ed.y"></label><input id="ed-y" type="number" step="0.5"></div>
+              <div class="prop"><label for="ed-w" data-i18n="ed.w"></label><input id="ed-w" type="number" step="0.5" min="0.5"></div>
+              <div class="prop"><label for="ed-h" data-i18n="ed.h"></label><input id="ed-h" type="number" step="0.5" min="0.5"></div>
+              <div class="prop"><label for="ed-rot" data-i18n="ed.rot"></label><input id="ed-rot" type="number" step="1"></div>
+              <div class="prop" id="ed-color-field"><label for="ed-color" data-i18n="ed.color"></label><input id="ed-color" type="color"></div>
+            </div>
+            <label class="check"><input type="checkbox" id="ed-lock"><span data-i18n="ed.lock"></span></label>
+            <div class="prop"><label for="ed-op"><span data-i18n="ed.opacity"></span> <output id="ed-op-out" for="ed-op"></output></label><input id="ed-op" type="range" min="0" max="100"></div>
+            <div>
+              <span class="prop-label" data-i18n="ed.fitLabel"></span>
+              <div class="btn-row">
+                <button type="button" class="btn btn-small" data-fit="stretch" data-i18n="ed.fitStretch"></button>
+                <button type="button" class="btn btn-small" data-fit="cover" data-i18n="ed.fitCover"></button>
+                <button type="button" class="btn btn-small" data-fit="contain" data-i18n="ed.fitContain"></button>
+                <button type="button" class="btn btn-small" data-fit="center" data-i18n="ed.fitCenter"></button>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-small" id="ed-flipx" data-i18n="ed.flipX"></button>
+              <button type="button" class="btn btn-small" id="ed-flipy" data-i18n="ed.flipY"></button>
+              <button type="button" class="btn btn-small" id="ed-dup" title="Ctrl+D" data-i18n="ed.dup"></button>
+              <button type="button" class="btn btn-small" id="ed-del" title="Delete" data-i18n="ed.del"></button>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+    <footer class="ed-foot">
+      <span id="ed-status" role="status" aria-live="polite"></span>
+      <button type="button" class="btn" id="ed-cancel" data-i18n="ed.cancel"></button>
+      <button type="button" class="btn btn-primary" id="ed-save" data-i18n="ed.save"></button>
+    </footer>
+  </div>
+</dialog>
+
+<script>
+'use strict';
+
+// ---- pure:start  (ส่วนนี้ไม่แตะหน้าเว็บ ใช้ทดสอบแยกได้)
+const SIZES = [
+  { key: 'large',  w: 82, h: 52, scale: 2, sub: '' },
+  { key: 'medium', w: 41, h: 26, scale: 2, sub: 'medium/' },
+  { key: 'small',  w: 10, h: 7,  scale: 4, sub: 'small/' },
+];
+
+// RGBA (เรียงจากบนลงล่าง) -> TGA 32 บิต ไม่บีบอัด จุดเริ่มมุมซ้ายล่าง แบบเดียวกับที่ GIMP export
+function rgbaToTGA(w, h, d) {
+  const out = new Uint8Array(18 + w * h * 4);
+  out[2] = 2;                       // true-color ไม่บีบอัด
+  out[12] = w & 255; out[13] = w >> 8;
+  out[14] = h & 255; out[15] = h >> 8;
+  out[16] = 32;                     // บิตต่อพิกเซล
+  out[17] = 8;                      // alpha 8 บิต, จุดเริ่มมุมซ้ายล่าง
+  let o = 18;
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      out[o++] = d[i + 2]; out[o++] = d[i + 1]; out[o++] = d[i]; out[o++] = d[i + 3];
+    }
+  }
+  return out;
+}
+
+// อ่าน TGA (ไม่บีบอัดหรือ RLE, สี 24/32 บิต หรือขาวดำ 8 บิต) -> RGBA
+function decodeTGA(b) {
+  if (b.length < 18) throw new Error('tgaShort');
+  const idLen = b[0], cmType = b[1], type = b[2];
+  const cmLen = b[5] | (b[6] << 8), cmBits = b[7];
+  const w = b[12] | (b[13] << 8), h = b[14] | (b[15] << 8), bpp = b[16], desc = b[17];
+  if (![2, 3, 10, 11].includes(type)) throw new Error('tgaType');
+  const gray = type === 3 || type === 11, rle = type === 10 || type === 11;
+  if (gray ? bpp !== 8 : (bpp !== 24 && bpp !== 32)) throw new Error('tgaBits');
+  if (!w || !h) throw new Error('tgaSize');
+
+  let p = 18 + idLen + (cmType ? cmLen * Math.ceil(cmBits / 8) : 0);
+  const step = bpp >> 3, n = w * h, data = new Uint8ClampedArray(n * 4);
+  const useAlpha = bpp === 32 && (desc & 15) > 0;
+  const top = (desc & 0x20) !== 0, rtl = (desc & 0x10) !== 0;
+  const broken = () => new Error('tgaBroken');
+  let k = 0;
+  const put = (q) => {
+    const x0 = k % w, y0 = (k / w) | 0;
+    const x = rtl ? w - 1 - x0 : x0, y = top ? y0 : h - 1 - y0;
+    const j = (y * w + x) * 4;
+    if (gray) { data[j] = data[j + 1] = data[j + 2] = b[q]; data[j + 3] = 255; }
+    else { data[j] = b[q + 2]; data[j + 1] = b[q + 1]; data[j + 2] = b[q]; data[j + 3] = useAlpha ? b[q + 3] : 255; }
+    k++;
+  };
+
+  if (!rle) {
+    if (p + n * step > b.length) throw broken();
+    while (k < n) { put(p); p += step; }
+  } else {
+    while (k < n) {
+      if (p >= b.length) throw broken();
+      const hd = b[p++], cnt = (hd & 127) + 1;
+      if (hd & 128) {
+        if (p + step > b.length) throw broken();
+        for (let r = 0; r < cnt && k < n; r++) put(p);
+        p += step;
+      } else {
+        if (p + cnt * step > b.length) throw broken();
+        for (let r = 0; r < cnt && k < n; r++) { put(p); p += step; }
+      }
+    }
+  }
+
+  // บางโปรแกรมเขียนช่อง alpha เป็นศูนย์ทั้งไฟล์ ถ้าเป็นแบบนั้นให้ถือว่าทึบทั้งหมด
+  if (useAlpha) {
+    let any = false;
+    for (let j = 3; j < data.length; j += 4) if (data[j]) { any = true; break; }
+    if (!any) for (let j = 3; j < data.length; j += 4) data[j] = 255;
+  }
+  return { w, h, data };
+}
+
+// ZIP แบบไม่บีบอัด (store) เขียนเองทั้งหมด ไม่ต้องพึ่งไลบรารีภายนอก
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(u8) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function makeZip(files, when = new Date()) {
+  const enc = new TextEncoder();
+  const time = (when.getHours() << 11) | (when.getMinutes() << 5) | (when.getSeconds() >> 1);
+  const date = ((Math.max(1980, when.getFullYear()) - 1980) << 9) | ((when.getMonth() + 1) << 5) | when.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true);
+    lh.setUint16(8, 0, true); lh.setUint16(10, time, true); lh.setUint16(12, date, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+    lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), name, f.data);
+
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true);
+    ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true); ch.setUint16(12, time, true);
+    ch.setUint16(14, date, true); ch.setUint32(16, crc, true); ch.setUint32(20, size, true);
+    ch.setUint32(24, size, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((s, c) => s + c.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
+}
+// ---- pure:end
+
+const $ = (s, el = document) => el.querySelector(s);
+// ---------- ภาษา ----------
+// เพิ่มภาษาใหม่: คัดลอกบล็อก en ไปแปล แล้วเพิ่มชื่อภาษาใน LANGS
+// ข้อความแบบ { one, few, many, other } ใช้กับจำนวนนับ (เลือกตาม {n})
+const LANGS = [
+  ['en', 'English', 'en'], ['th', 'ไทย', 'th'], ['ru', 'Русский', 'ru'], ['zh', '简体中文', 'zh-CN'],
+  ['ja', '日本語', 'ja'], ['de', 'Deutsch', 'de'], ['es', 'Español', 'es'], ['pt', 'Português (Brasil)', 'pt-BR'],
+];
+const HTML_LANG = Object.fromEntries(LANGS.map(([c, , h]) => [c, h]));
+// ผู้สร้าง (ใช้ในบรรทัดสัญญาอนุญาต MIT ท้ายหน้า ถ้าเปลี่ยนชื่อ ให้แก้ในไฟล์ LICENSE และคอมเมนต์บนสุดด้วย)
+const OWNER = 'Firemask animation 2.3', COPYRIGHT_YEAR = 2026;
+const I18N = {
+  th: {
+    'title': 'ธงสำหรับ HOI4: ย่อและแปลงเป็น TGA',
+    'lang.label': 'ภาษา',
+    'h1': 'ธงสำหรับ HOI4',
+    'lede': 'ย่อรูปหรือซ้อนหลายรูปเป็นเลเยอร์ ให้ได้ธง 3 ขนาดที่เกมใช้ แล้วแปลงเป็นไฟล์ .tga&nbsp;32&nbsp;บิต พร้อมวางลงใน mod',
+    'sizes.aria': 'ขนาดธงที่จะได้ 82×52, 41×26 และ 10×7 พิกเซล',
+    'local': 'ทุกอย่างทำงานในเบราว์เซอร์ของคุณ หน้านี้ตั้งค่าไม่ให้เชื่อมต่ออินเทอร์เน็ตเลย ไฟล์จึงไม่ถูกส่งออกไปไหน และเปิดอ่านโค้ดทั้งหมดได้ด้วย View Source',
+    'drop.title': 'ลากรูปธงมาวางที่นี่',
+    'drop.hint': 'รองรับ PNG, JPG, WebP, BMP, GIF และ TGA ชื่อไฟล์จะกลายเป็นชื่อธง และกด Ctrl+V เพื่อวางรูปจากคลิปบอร์ดก็ได้',
+    'btn.files': 'เลือกไฟล์',
+    'btn.folder': 'เลือกทั้งโฟลเดอร์',
+    'mode.legend': 'ถ้าสัดส่วนรูปไม่ตรงกับธง',
+    'mode.stretch': 'ยืดให้เต็มกรอบ',
+    'mode.stretch.sub': 'แบบเดียวกับโปรแกรมต้นฉบับ เหมาะกับรูปที่สัดส่วนใกล้ธงอยู่แล้ว',
+    'mode.cover': 'ครอปส่วนเกินออก',
+    'mode.cover.sub': 'รูปไม่เบี้ยว ตัดส่วนที่ล้นออกเท่า ๆ กันทั้งสองฝั่ง',
+    'mode.contain': 'ย่อให้พอดีแล้วเว้นขอบใส',
+    'mode.contain.sub': 'เห็นรูปครบทั้งหมด แต่อาจมีขอบโปร่งใส',
+    'mode.note': 'ธงที่แก้ในหน้าแก้ไขเลเยอร์แล้วจะไม่เปลี่ยนตามตัวเลือกนี้',
+    'layout.legend': 'โฟลเดอร์ในไฟล์ ZIP',
+    'layout.mod': 'แบบ mod',
+    'layout.mod.sub': '<code>gfx/flags</code> พร้อม <code>medium</code> และ <code>small</code> แตกไฟล์ลง mod ได้เลย',
+    'layout.split': 'แยกตามขนาด',
+    'list.title': 'ธงที่จะแปลง',
+    'bulk.label': 'อุดมการณ์ของทุกธง',
+    'bulk.apply': 'ใช้กับทุกธง',
+    'bulk.clear': 'ล้างทั้งหมด',
+    'list.empty': 'ยังไม่มีธง เพิ่มรูปจากด้านบน หรือลากไฟล์มาวางตรงไหนของหน้าก็ได้',
+    'guide.summary': 'วิธีใช้และการวางลง mod',
+    'guide.p1': 'กด "แก้ไขเลเยอร์" ที่ธงแต่ละอันเพื่อเปิดหน้าแก้ไข ซ้อนรูปหลายรูปเป็นเลเยอร์ได้ เช่น ใช้สี่เหลี่ยมทำแถบสีเป็นพื้นหลังแล้ววางตราไว้ตรงกลาง แต่ละเลเยอร์ย้าย ย่อขยาย ยืด หมุน พลิก และปรับความทึบได้ ตัวอย่าง 3 ขนาดในหน้าแก้ไขคือหน้าตาไฟล์ที่จะได้จริง',
+    'guide.p2': 'แตกไฟล์ ZIP แบบ mod แล้ววางโฟลเดอร์ <code>gfx</code> ลงในโฟลเดอร์ mod ของคุณ เกมจะอ่านธงใหญ่จาก <code>gfx/flags</code> ธงกลางจาก <code>gfx/flags/medium</code> และธงเล็กจาก <code>gfx/flags/small</code>',
+    'guide.p3': 'ชื่อแท็กต้องตรงกับแท็กประเทศ เช่น <code>GER</code> ถ้าจะทำธงแยกตามอุดมการณ์ ให้เลือกในช่องอุดมการณ์ ระบบจะเติม <code>_communism</code>, <code>_democratic</code>, <code>_fascism</code> หรือ <code>_neutrality</code> ต่อท้ายให้ ธงที่ไม่เติมคำต่อท้ายคือธงหลักที่เกมใช้เมื่อหาธงของอุดมการณ์นั้นไม่เจอ',
+    'guide.p4': 'ถ้าชื่อไฟล์รูปลงท้ายด้วยคำเหล่านี้อยู่แล้ว เช่น <code>GER_fascism.png</code> ระบบจะแยกเป็นแท็ก <code>GER</code> กับอุดมการณ์ fascism ให้เอง พิมพ์คำต่อท้ายลงในช่องชื่อแท็กก็ได้ผลเหมือนกัน',
+    'guide.p5': 'ถ้าเลือกทั้งโฟลเดอร์ ระบบจะข้ามโฟลเดอร์ย่อยชื่อ <code>medium</code> และ <code>small</code> ให้ จึงเลือกโฟลเดอร์ <code>gfx/flags</code> เดิมของ mod เพื่อทำธงชุดใหม่จากธงใหญ่ได้เลย',
+    'download': 'ดาวน์โหลด ZIP',
+    'count.none': 'ยังไม่มีธง',
+    'count.ready': '{n} ธง ได้ {files} ไฟล์',
+    'count.problems': 'แก้ชื่อ {n} ธงก่อนดาวน์โหลด',
+    'row.tag': 'ชื่อแท็ก',
+    'row.ideo': 'อุดมการณ์',
+    'row.out': 'ได้ไฟล์',
+    'row.edit': 'แก้ไขเลเยอร์',
+    'row.remove': 'ลบ',
+    'row.from': 'จาก {file} ({w}×{h})',
+    'row.edited': 'แก้ไขแล้ว มี {n} เลเยอร์',
+    'row.noName': 'ยังไม่มีชื่อ',
+    'row.unnamed': 'ที่ยังไม่มีชื่อ',
+    'row.removeAria': 'ลบธง {name}',
+    'row.editAria': 'แก้ไขเลเยอร์ของธง {name}',
+    'err.noName': 'ใส่ชื่อแท็กก่อนดาวน์โหลด',
+    'err.dup': 'ชื่อซ้ำกับธงอื่น เปลี่ยนแท็กหรืออุดมการณ์ ไม่อย่างนั้นไฟล์จะเขียนทับกัน',
+    'ideo.none': 'ไม่เติม',
+    'ideo.communism': 'คอมมิวนิสต์',
+    'ideo.democratic': 'ประชาธิปไตย',
+    'ideo.fascism': 'ฟาสซิสต์',
+    'ideo.neutrality': 'เป็นกลาง',
+    'st.removed': 'ลบ {name} แล้ว',
+    'st.noImages': 'ไม่พบไฟล์รูปที่รองรับ',
+    'st.reading': 'กำลังอ่านรูป {i} จาก {n}',
+    'st.added': 'เพิ่ม {n} ธงแล้ว',
+    'st.failed': ' อ่านไม่ได้: {list}',
+    'st.downloaded': 'ดาวน์โหลด hoi4_flags.zip แล้ว ({n} ไฟล์)',
+    'st.bulkSet': 'ตั้งทุกธงเป็น _{v} แล้ว',
+    'st.bulkNone': 'เอาคำต่อท้ายออกจากทุกธงแล้ว',
+    'st.cleared': 'ล้างทั้งหมดแล้ว',
+    'st.saved': 'บันทึกการแก้ไขธง {name} แล้ว',
+    'st.resetSaved': 'ธง {name} กลับไปใช้รูปต้นฉบับแล้ว',
+    'err.tgaShort': 'ไฟล์ TGA สั้นเกินไป',
+    'err.tgaType': 'TGA ชนิดนี้ยังไม่รองรับ',
+    'err.tgaBits': 'รองรับเฉพาะ TGA 24 หรือ 32 บิต',
+    'err.tgaSize': 'TGA ไม่มีขนาด',
+    'err.tgaBroken': 'ไฟล์ TGA ไม่สมบูรณ์',
+    'err.imgRead': 'เบราว์เซอร์อ่านรูปนี้ไม่ได้',
+    'err.imgSize': 'รูปไม่มีขนาด',
+    'img.default': 'รูป',
+    'ed.title': 'แก้ไขเลเยอร์ของ {name}',
+    'ed.close': 'ปิดโดยไม่บันทึก',
+    'ed.addImg': 'เพิ่มรูป',
+    'ed.addRect': 'เพิ่มสี่เหลี่ยม',
+    'ed.addEllipse': 'เพิ่มวงรี',
+    'ed.undo': 'ย้อนกลับ',
+    'ed.redo': 'ทำซ้ำ',
+    'ed.reset': 'เริ่มใหม่จากรูปต้นฉบับ',
+    'ed.stageAria': 'พื้นที่จัดวางธง กรอบสีทองคือขอบธง กดลูกศรเพื่อเลื่อนเลเยอร์ที่เลือก',
+    'ed.hint': 'ลากเพื่อย้าย ลากจุดมุมเพื่อย่อขยาย ลากจุดกลางขอบเพื่อยืดด้านเดียว ลากจุดกลมด้านบนเพื่อหมุน กด Shift ค้างเพื่อสลับการล็อกสัดส่วนหรือหมุนทีละ 15° กด Alt ค้างเพื่อปิดการดูดเข้าแนวกลางและขอบ ปุ่มลูกศรเลื่อนทีละ 1 พิกเซลของธงใหญ่ ลากรูปมาวางหรือกด Ctrl+V เพื่อเพิ่มเป็นเลเยอร์ใหม่ได้',
+    'ed.layers': 'เลเยอร์',
+    'ed.layersSub': 'อันบนสุดของรายการอยู่หน้าสุด',
+    'ed.selected': 'เลเยอร์ที่เลือก',
+    'ed.noselect': 'คลิกที่รูปบนพื้นที่จัดวาง หรือเลือกจากรายการเลเยอร์',
+    'ed.x': 'ตำแหน่ง X (%)',
+    'ed.y': 'ตำแหน่ง Y (%)',
+    'ed.w': 'กว้าง (%)',
+    'ed.h': 'สูง (%)',
+    'ed.rot': 'หมุน (องศา)',
+    'ed.color': 'สี',
+    'ed.lock': 'ล็อกสัดส่วนตอนย่อขยาย',
+    'ed.opacity': 'ความทึบ',
+    'ed.fitLabel': 'จัดวางในกรอบธง',
+    'ed.fitStretch': 'ยืดเต็มกรอบ',
+    'ed.fitCover': 'ครอปให้เต็ม',
+    'ed.fitContain': 'ย่อให้พอดี',
+    'ed.fitCenter': 'กึ่งกลาง',
+    'ed.flipX': 'พลิกซ้ายขวา',
+    'ed.flipY': 'พลิกบนล่าง',
+    'ed.dup': 'ทำสำเนา',
+    'ed.del': 'ลบเลเยอร์',
+    'ed.cancel': 'ยกเลิก',
+    'ed.save': 'บันทึกการแก้ไข',
+    'ed.rectName': 'สี่เหลี่ยม {n}',
+    'ed.ellipseName': 'วงรี {n}',
+    'ed.copy': '(สำเนา)',
+    'ed.hide': 'ซ่อน {name}',
+    'ed.show': 'แสดง {name}',
+    'ed.up': 'เลื่อน {name} ขึ้นหน้า',
+    'ed.down': 'เลื่อน {name} ไปข้างหลัง',
+    'ed.noLayers': 'ไม่มีเลเยอร์ กดเพิ่มรูปหรือรูปทรงด้านบน',
+    'ed.dupDone': 'ทำสำเนา {name} แล้ว',
+    'ed.delDone': 'ลบ {name} แล้ว กดย้อนกลับเพื่อเอาคืน',
+    'ed.added': 'เพิ่ม {n} เลเยอร์แล้ว',
+    'ed.resetDone': 'กลับไปใช้รูปต้นฉบับแล้ว กดย้อนกลับถ้าอยากได้เลเยอร์เดิมคืน',
+    'ed.zoomGroup': 'ซูม',
+    'ed.zoomIn': 'ซูมเข้า',
+    'ed.zoomOut': 'ซูมออก',
+    'ed.zoomFit': 'พอดีจอ',
+    'ed.zoomHint': 'ซูมด้วย Ctrl + ลูกกลิ้งเมาส์, Ctrl + / Ctrl − หรือหนีบสองนิ้วบนจอสัมผัส (Ctrl+0 กลับมาพอดีจอ) ตอนซูมอยู่ เลื่อนมุมมองได้ด้วยลูกกลิ้งเมาส์ ลากพื้นที่ว่าง กด Space ค้างแล้วลาก หรือลากด้วยปุ่มกลางเมาส์',
+    'legal.oss': 'ซอฟต์แวร์โอเพนซอร์ส ใช้งานฟรี เผยแพร่ภายใต้สัญญาอนุญาต MIT © {year} {owner}',
+    'legal.note': 'ใช้ คัดลอก แก้ไข และแจกต่อได้ โดยต้องเก็บข้อความสัญญาอนุญาตไว้กับโค้ดด้วย',
+  },
+
+  en: {
+    'title': 'HOI4 Flags: resize and convert to TGA',
+    'lang.label': 'Language',
+    'h1': 'Flags for HOI4',
+    'lede': 'Resize an image, or stack several as layers, into the three flag sizes the game uses, then convert them to 32-bit .tga files ready for your mod',
+    'sizes.aria': 'Output flag sizes: 82×52, 41×26 and 10×7 pixels',
+    'local': 'Everything runs in your browser. This page is blocked from connecting to the internet, so your files never leave your computer, and you can read all of its code with View Source.',
+    'drop.title': 'Drop flag images here',
+    'drop.hint': 'PNG, JPG, WebP, BMP, GIF and TGA are supported. The file name becomes the flag name. You can also paste an image with Ctrl+V.',
+    'btn.files': 'Choose files',
+    'btn.folder': 'Choose a folder',
+    'mode.legend': "If the image doesn't match the flag's proportions",
+    'mode.stretch': 'Stretch to fill',
+    'mode.stretch.sub': 'Same as the original program. Best for images already close to flag proportions.',
+    'mode.cover': 'Crop the overflow',
+    'mode.cover.sub': 'No distortion. Trims the same amount from both sides.',
+    'mode.contain': 'Fit inside with transparent margins',
+    'mode.contain.sub': 'The whole image stays visible, but there may be transparent edges.',
+    'mode.note': "Flags you've edited in the layer editor aren't affected by this option.",
+    'layout.legend': 'Folders in the ZIP',
+    'layout.mod': 'Mod layout',
+    'layout.mod.sub': '<code>gfx/flags</code> with <code>medium</code> and <code>small</code>. Unzip straight into your mod.',
+    'layout.split': 'One folder per size',
+    'layout.split.sub': '<code>large</code>, <code>medium</code>, <code>small</code>',
+    'list.title': 'Flags to convert',
+    'bulk.label': 'Ideology for all flags',
+    'bulk.apply': 'Apply to all',
+    'bulk.clear': 'Clear all',
+    'list.empty': 'No flags yet. Add images above, or drop files anywhere on the page.',
+    'guide.summary': 'How to use it and add flags to your mod',
+    'guide.p1': 'Press "Edit layers" on any flag to open the editor. You can stack several images as layers, for example rectangles as colored stripes with an emblem in the middle. Each layer can be moved, scaled, stretched, rotated, flipped and made transparent. The three previews in the editor show exactly what the files will look like.',
+    'guide.p2': 'Unzip the mod-layout ZIP and put the <code>gfx</code> folder into your mod folder. The game reads large flags from <code>gfx/flags</code>, medium flags from <code>gfx/flags/medium</code> and small flags from <code>gfx/flags/small</code>.',
+    'guide.p3': "The tag must match the country tag, such as <code>GER</code>. For ideology-specific flags, pick one in the Ideology box and <code>_communism</code>, <code>_democratic</code>, <code>_fascism</code> or <code>_neutrality</code> is added to the name. A flag with no suffix is the default the game uses when it can't find a flag for that ideology.",
+    'guide.p4': "If an image's file name already ends with one of these, like <code>GER_fascism.png</code>, it's split into the tag <code>GER</code> and the fascism ideology automatically. Typing the suffix into the tag box works the same way.",
+    'guide.p5': "When you choose a whole folder, subfolders named <code>medium</code> and <code>small</code> are skipped, so you can pick your mod's existing <code>gfx/flags</code> folder to remake every size from the large flags.",
+    'download': 'Download ZIP',
+    'count.none': 'No flags yet',
+    'count.ready': { one: '{n} flag, {files} files', other: '{n} flags, {files} files' },
+    'count.problems': { one: 'Fix 1 flag name before downloading', other: 'Fix {n} flag names before downloading' },
+    'row.tag': 'Tag',
+    'row.ideo': 'Ideology',
+    'row.out': 'Output file',
+    'row.edit': 'Edit layers',
+    'row.remove': 'Remove',
+    'row.from': 'From {file} ({w}×{h})',
+    'row.edited': { one: 'Edited, 1 layer', other: 'Edited, {n} layers' },
+    'row.noName': 'no name yet',
+    'row.unnamed': '(unnamed)',
+    'row.removeAria': 'Remove flag {name}',
+    'row.editAria': 'Edit layers of flag {name}',
+    'err.noName': 'Enter a tag before downloading',
+    'err.dup': 'Another flag has the same name. Change the tag or ideology, or the files will overwrite each other.',
+    'ideo.none': 'No suffix',
+    'ideo.communism': 'Communism',
+    'ideo.democratic': 'Democratic',
+    'ideo.fascism': 'Fascism',
+    'ideo.neutrality': 'Non-aligned',
+    'st.removed': 'Removed {name}',
+    'st.noImages': 'No supported image files found',
+    'st.reading': 'Reading image {i} of {n}',
+    'st.added': { one: 'Added 1 flag', other: 'Added {n} flags' },
+    'st.failed': "; couldn't read: {list}",
+    'st.downloaded': 'Downloaded hoi4_flags.zip ({n} files)',
+    'st.bulkSet': 'All flags set to _{v}',
+    'st.bulkNone': 'Removed the suffix from all flags',
+    'st.cleared': 'Cleared all flags',
+    'st.saved': 'Saved changes to flag {name}',
+    'st.resetSaved': 'Flag {name} is back to its original image',
+    'err.tgaShort': 'TGA file is too short',
+    'err.tgaType': "This kind of TGA isn't supported",
+    'err.tgaBits': 'Only 24- or 32-bit TGA is supported',
+    'err.tgaSize': 'TGA has no size',
+    'err.tgaBroken': 'TGA file is incomplete',
+    'err.imgRead': "The browser can't read this image",
+    'err.imgSize': 'Image has no size',
+    'img.default': 'image',
+    'ed.title': 'Edit layers: {name}',
+    'ed.close': 'Close without saving',
+    'ed.addImg': 'Add image',
+    'ed.addRect': 'Add rectangle',
+    'ed.addEllipse': 'Add ellipse',
+    'ed.undo': 'Undo',
+    'ed.redo': 'Redo',
+    'ed.reset': 'Start over from the original',
+    'ed.stageAria': 'Flag layout area. The gold frame is the flag edge. Use the arrow keys to move the selected layer.',
+    'ed.hint': 'Drag to move. Drag a corner to scale, a side handle to stretch one side, and the round handle on top to rotate. Hold Shift to toggle the aspect lock or rotate in 15° steps, and hold Alt to turn off snapping to the center and edges. Arrow keys move 1 pixel of the large flag. Drop or paste images to add them as new layers.',
+    'ed.layers': 'Layers',
+    'ed.layersSub': 'Top of the list is in front',
+    'ed.selected': 'Selected layer',
+    'ed.noselect': 'Click a layer on the canvas or pick one from the list',
+    'ed.x': 'Position X (%)',
+    'ed.y': 'Position Y (%)',
+    'ed.w': 'Width (%)',
+    'ed.h': 'Height (%)',
+    'ed.rot': 'Rotation (°)',
+    'ed.color': 'Color',
+    'ed.lock': 'Keep proportions when scaling',
+    'ed.opacity': 'Opacity',
+    'ed.fitLabel': 'Fit to the flag',
+    'ed.fitStretch': 'Stretch',
+    'ed.fitCover': 'Fill and crop',
+    'ed.fitContain': 'Fit inside',
+    'ed.fitCenter': 'Center',
+    'ed.flipX': 'Flip horizontally',
+    'ed.flipY': 'Flip vertically',
+    'ed.dup': 'Duplicate',
+    'ed.del': 'Delete layer',
+    'ed.cancel': 'Cancel',
+    'ed.save': 'Save changes',
+    'ed.rectName': 'Rectangle {n}',
+    'ed.ellipseName': 'Ellipse {n}',
+    'ed.copy': '(copy)',
+    'ed.hide': 'Hide {name}',
+    'ed.show': 'Show {name}',
+    'ed.up': 'Bring {name} forward',
+    'ed.down': 'Send {name} backward',
+    'ed.noLayers': 'No layers. Add an image or a shape above.',
+    'ed.dupDone': 'Duplicated {name}',
+    'ed.delDone': 'Deleted {name}. Press Undo to bring it back.',
+    'ed.added': { one: 'Added 1 layer', other: 'Added {n} layers' },
+    'ed.resetDone': 'Back to the original image. Press Undo if you want your layers back.',
+    'ed.zoomGroup': 'Zoom',
+    'ed.zoomIn': 'Zoom in',
+    'ed.zoomOut': 'Zoom out',
+    'ed.zoomFit': 'Fit view',
+    'ed.zoomHint': 'Zoom with Ctrl + mouse wheel, Ctrl + / Ctrl −, or a two-finger pinch (Ctrl+0 fits the view again). While zoomed in, pan with the mouse wheel, by dragging an empty area, by holding Space and dragging, or with the middle mouse button.',
+    'legal.oss': 'Free and open source under the MIT License. © {year} {owner}',
+    'legal.note': 'You may use, copy, modify and share it, as long as the license notice stays with the code.',
+  },
+
+  ru: {
+    'title': 'Флаги для HOI4: изменение размера и конвертация в TGA',
+    'lang.label': 'Язык',
+    'h1': 'Флаги для HOI4',
+    'lede': 'Уменьшите изображение или соберите несколько слоёв в три размера флага, которые использует игра, и сохраните их как 32-битные .tga, готовые для мода',
+    'sizes.aria': 'Размеры флагов: 82×52, 41×26 и 10×7 пикселей',
+    'local': 'Всё работает прямо в браузере. Странице запрещено подключаться к интернету, поэтому файлы никуда не отправляются, а весь код можно прочитать через «Просмотр кода страницы».',
+    'drop.title': 'Перетащите сюда изображения флагов',
+    'drop.hint': 'Поддерживаются PNG, JPG, WebP, BMP, GIF и TGA. Имя файла станет именем флага. Изображение можно вставить и через Ctrl+V.',
+    'btn.files': 'Выбрать файлы',
+    'btn.folder': 'Выбрать папку',
+    'mode.legend': 'Если пропорции изображения не совпадают с флагом',
+    'mode.stretch': 'Растянуть на всю площадь',
+    'mode.stretch.sub': 'Как в исходной программе. Подходит, если пропорции уже близки к флагу.',
+    'mode.cover': 'Обрезать лишнее',
+    'mode.cover.sub': 'Без искажений, лишнее срезается поровну с обеих сторон.',
+    'mode.contain': 'Вписать с прозрачными полями',
+    'mode.contain.sub': 'Изображение видно целиком, но могут остаться прозрачные края.',
+    'mode.note': 'На флаги, изменённые в редакторе слоёв, этот параметр не влияет.',
+    'layout.legend': 'Папки в ZIP-архиве',
+    'layout.mod': 'Как в моде',
+    'layout.mod.sub': '<code>gfx/flags</code> с <code>medium</code> и <code>small</code>. Распакуйте прямо в мод.',
+    'layout.split': 'По размерам',
+    'list.title': 'Флаги для конвертации',
+    'bulk.label': 'Идеология для всех флагов',
+    'bulk.apply': 'Применить ко всем',
+    'bulk.clear': 'Очистить всё',
+    'list.empty': 'Флагов пока нет. Добавьте изображения выше или перетащите файлы в любое место страницы.',
+    'guide.summary': 'Как пользоваться и добавить флаги в мод',
+    'guide.p1': 'Нажмите «Редактировать слои» у любого флага, чтобы открыть редактор. Можно накладывать несколько изображений слоями, например прямоугольники как цветные полосы и герб в центре. Каждый слой можно перемещать, масштабировать, растягивать, поворачивать, отражать и делать прозрачным. Три превью в редакторе показывают, как будут выглядеть готовые файлы.',
+    'guide.p2': 'Распакуйте ZIP в варианте «Как в моде» и положите папку <code>gfx</code> в папку мода. Игра берёт большие флаги из <code>gfx/flags</code>, средние из <code>gfx/flags/medium</code>, маленькие из <code>gfx/flags/small</code>.',
+    'guide.p3': 'Тег должен совпадать с тегом страны, например <code>GER</code>. Для флагов отдельных идеологий выберите идеологию, и к имени добавится <code>_communism</code>, <code>_democratic</code>, <code>_fascism</code> или <code>_neutrality</code>. Флаг без суффикса игра использует, если не находит флаг для текущей идеологии.',
+    'guide.p4': 'Если имя файла уже заканчивается таким суффиксом, например <code>GER_fascism.png</code>, оно автоматически разделится на тег <code>GER</code> и идеологию fascism. То же произойдёт, если ввести суффикс в поле тега.',
+    'guide.p5': 'При выборе папки вложенные папки <code>medium</code> и <code>small</code> пропускаются, поэтому можно выбрать существующую папку <code>gfx/flags</code> мода и пересоздать все размеры из больших флагов.',
+    'download': 'Скачать ZIP',
+    'count.none': 'Флагов пока нет',
+    'count.ready': 'Флагов: {n}, файлов: {files}',
+    'count.problems': 'Исправьте имена перед скачиванием: {n}',
+    'row.tag': 'Тег',
+    'row.ideo': 'Идеология',
+    'row.out': 'Файл',
+    'row.edit': 'Редактировать слои',
+    'row.remove': 'Удалить',
+    'row.from': 'Из {file} ({w}×{h})',
+    'row.edited': 'Изменён, слоёв: {n}',
+    'row.noName': 'имя не задано',
+    'row.unnamed': '(без имени)',
+    'row.removeAria': 'Удалить флаг {name}',
+    'row.editAria': 'Редактировать слои флага {name}',
+    'err.noName': 'Введите тег перед скачиванием',
+    'err.dup': 'Такое имя уже есть у другого флага. Измените тег или идеологию, иначе файлы перезапишут друг друга.',
+    'ideo.none': 'Без суффикса',
+    'ideo.communism': 'коммунизм',
+    'ideo.democratic': 'демократия',
+    'ideo.fascism': 'фашизм',
+    'ideo.neutrality': 'неприсоединение',
+    'st.removed': 'Флаг {name} удалён',
+    'st.noImages': 'Подходящих изображений не найдено',
+    'st.reading': 'Чтение изображения {i} из {n}',
+    'st.added': 'Добавлено флагов: {n}',
+    'st.failed': '; не удалось прочитать: {list}',
+    'st.downloaded': 'hoi4_flags.zip скачан (файлов: {n})',
+    'st.bulkSet': 'Для всех флагов задан суффикс _{v}',
+    'st.bulkNone': 'Суффикс убран у всех флагов',
+    'st.cleared': 'Все флаги удалены',
+    'st.saved': 'Изменения флага {name} сохранены',
+    'st.resetSaved': 'Флаг {name} снова использует исходное изображение',
+    'err.tgaShort': 'Файл TGA слишком короткий',
+    'err.tgaType': 'Этот тип TGA не поддерживается',
+    'err.tgaBits': 'Поддерживаются только 24- и 32-битные TGA',
+    'err.tgaSize': 'У TGA нулевой размер',
+    'err.tgaBroken': 'Файл TGA повреждён',
+    'err.imgRead': 'Браузер не может прочитать это изображение',
+    'err.imgSize': 'У изображения нулевой размер',
+    'img.default': 'изображение',
+    'ed.title': 'Слои флага {name}',
+    'ed.close': 'Закрыть без сохранения',
+    'ed.addImg': 'Добавить изображение',
+    'ed.addRect': 'Добавить прямоугольник',
+    'ed.addEllipse': 'Добавить эллипс',
+    'ed.undo': 'Отменить',
+    'ed.redo': 'Повторить',
+    'ed.reset': 'Начать заново с исходника',
+    'ed.stageAria': 'Область компоновки флага. Золотая рамка показывает край флага. Стрелки перемещают выбранный слой.',
+    'ed.hint': 'Перетаскивайте, чтобы перемещать. Угол меняет размер, боковой маркер растягивает одну сторону, круглый маркер сверху поворачивает. Shift переключает сохранение пропорций или поворот шагом 15°, Alt отключает привязку к центру и краям. Стрелки двигают на 1 пиксель большого флага. Перетащите или вставьте изображение, чтобы добавить новый слой.',
+    'ed.layers': 'Слои',
+    'ed.layersSub': 'Верхний в списке находится спереди',
+    'ed.selected': 'Выбранный слой',
+    'ed.noselect': 'Щёлкните слой на холсте или выберите его в списке',
+    'ed.x': 'Позиция X (%)',
+    'ed.y': 'Позиция Y (%)',
+    'ed.w': 'Ширина (%)',
+    'ed.h': 'Высота (%)',
+    'ed.rot': 'Поворот (°)',
+    'ed.color': 'Цвет',
+    'ed.lock': 'Сохранять пропорции при масштабировании',
+    'ed.opacity': 'Непрозрачность',
+    'ed.fitLabel': 'Разместить во флаге',
+    'ed.fitStretch': 'Растянуть',
+    'ed.fitCover': 'Заполнить',
+    'ed.fitContain': 'Вписать',
+    'ed.fitCenter': 'По центру',
+    'ed.flipX': 'Отразить по горизонтали',
+    'ed.flipY': 'Отразить по вертикали',
+    'ed.dup': 'Дублировать',
+    'ed.del': 'Удалить слой',
+    'ed.cancel': 'Отмена',
+    'ed.save': 'Сохранить изменения',
+    'ed.rectName': 'Прямоугольник {n}',
+    'ed.ellipseName': 'Эллипс {n}',
+    'ed.copy': '(копия)',
+    'ed.hide': 'Скрыть {name}',
+    'ed.show': 'Показать {name}',
+    'ed.up': 'Переместить {name} вперёд',
+    'ed.down': 'Переместить {name} назад',
+    'ed.noLayers': 'Слоёв нет. Добавьте изображение или фигуру выше.',
+    'ed.dupDone': 'Слой {name} продублирован',
+    'ed.delDone': 'Слой {name} удалён. Нажмите «Отменить», чтобы вернуть его.',
+    'ed.added': 'Добавлено слоёв: {n}',
+    'ed.resetDone': 'Возвращено исходное изображение. Нажмите «Отменить», чтобы вернуть слои.',
+    'ed.zoomGroup': 'Масштаб',
+    'ed.zoomIn': 'Приблизить',
+    'ed.zoomOut': 'Отдалить',
+    'ed.zoomFit': 'Весь флаг',
+    'ed.zoomHint': 'Масштаб: Ctrl + колесо мыши, Ctrl + / Ctrl − или щипок двумя пальцами (Ctrl+0 снова показывает всё). При увеличении вид двигается колесом мыши, перетаскиванием пустого места, перетаскиванием с зажатым пробелом или средней кнопкой мыши.',
+    'legal.oss': 'Свободное ПО с открытым исходным кодом по лицензии MIT. © {year} {owner}',
+    'legal.note': 'Его можно использовать, копировать, изменять и распространять, если вместе с кодом сохраняется текст лицензии.',
+  },
+
+  zh: {
+    'title': 'HOI4 旗帜：缩放并转换为 TGA',
+    'lang.label': '语言',
+    'h1': 'HOI4 旗帜',
+    'lede': '缩放图片，或把多张图片叠成图层，生成游戏使用的三种旗帜尺寸，并转换为可直接放进模组的 32 位 .tga 文件',
+    'sizes.aria': '输出旗帜尺寸：82×52、41×26 和 10×7 像素',
+    'local': '所有处理都在你的浏览器中完成。本页面被设置为禁止联网，文件不会上传到任何地方，你也可以通过“查看网页源代码”阅读全部代码。',
+    'drop.title': '将旗帜图片拖到这里',
+    'drop.hint': '支持 PNG、JPG、WebP、BMP、GIF 和 TGA。文件名会成为旗帜名称，也可以用 Ctrl+V 粘贴图片。',
+    'btn.files': '选择文件',
+    'btn.folder': '选择文件夹',
+    'mode.legend': '当图片比例与旗帜不符时',
+    'mode.stretch': '拉伸填满',
+    'mode.stretch.sub': '与原程序相同，适合比例本来就接近旗帜的图片。',
+    'mode.cover': '裁掉多余部分',
+    'mode.cover.sub': '不变形，两侧裁掉相同的量。',
+    'mode.contain': '完整放入并留透明边',
+    'mode.contain.sub': '完整显示整张图片，但可能留有透明边缘。',
+    'mode.note': '已在图层编辑器中修改过的旗帜不受此选项影响。',
+    'layout.legend': 'ZIP 中的文件夹结构',
+    'layout.mod': '模组结构',
+    'layout.mod.sub': '<code>gfx/flags</code> 及其中的 <code>medium</code> 和 <code>small</code>，可直接解压到模组中。',
+    'layout.split': '按尺寸分开',
+    'layout.split.sub': '<code>large</code>、<code>medium</code>、<code>small</code>',
+    'list.title': '待转换的旗帜',
+    'bulk.label': '所有旗帜的意识形态',
+    'bulk.apply': '应用到全部',
+    'bulk.clear': '全部清除',
+    'list.empty': '还没有旗帜。从上方添加图片，或把文件拖到页面任意位置。',
+    'guide.summary': '使用方法及放入模组',
+    'guide.p1': '点击旗帜上的“编辑图层”打开编辑器。可以把多张图片叠成图层，例如用矩形做彩色条纹，再把徽章放在中间。每个图层都能移动、缩放、拉伸、旋转、翻转和调整不透明度。编辑器中的三种尺寸预览就是最终文件的样子。',
+    'guide.p2': '解压“模组结构”的 ZIP，把 <code>gfx</code> 文件夹放进你的模组文件夹。游戏会从 <code>gfx/flags</code> 读取大旗，从 <code>gfx/flags/medium</code> 读取中旗，从 <code>gfx/flags/small</code> 读取小旗。',
+    'guide.p3': '标签必须与国家标签一致，例如 <code>GER</code>。要为不同意识形态制作旗帜，在“意识形态”中选择，名称后会自动加上 <code>_communism</code>、<code>_democratic</code>、<code>_fascism</code> 或 <code>_neutrality</code>。没有后缀的旗帜是游戏找不到对应意识形态旗帜时使用的默认旗帜。',
+    'guide.p4': '如果图片文件名已经以这些后缀结尾，例如 <code>GER_fascism.png</code>，会自动拆分为标签 <code>GER</code> 和 fascism 意识形态。在标签框里输入后缀也一样。',
+    'guide.p5': '选择整个文件夹时，会跳过名为 <code>medium</code> 和 <code>small</code> 的子文件夹，因此可以直接选择模组现有的 <code>gfx/flags</code>，用大旗重新生成所有尺寸。',
+    'download': '下载 ZIP',
+    'count.none': '还没有旗帜',
+    'count.ready': '{n} 面旗帜，共 {files} 个文件',
+    'count.problems': '下载前请修正 {n} 个旗帜名称',
+    'row.tag': '标签',
+    'row.ideo': '意识形态',
+    'row.out': '输出文件',
+    'row.edit': '编辑图层',
+    'row.remove': '删除',
+    'row.from': '来自 {file}（{w}×{h}）',
+    'row.edited': '已编辑，共 {n} 个图层',
+    'row.noName': '尚未命名',
+    'row.unnamed': '（未命名）',
+    'row.removeAria': '删除旗帜 {name}',
+    'row.editAria': '编辑旗帜 {name} 的图层',
+    'err.noName': '下载前请填写标签',
+    'err.dup': '与其他旗帜重名。请修改标签或意识形态，否则文件会互相覆盖。',
+    'ideo.none': '不加后缀',
+    'ideo.communism': '共产主义',
+    'ideo.democratic': '民主主义',
+    'ideo.fascism': '法西斯主义',
+    'ideo.neutrality': '不结盟',
+    'st.removed': '已删除 {name}',
+    'st.noImages': '没有找到支持的图片文件',
+    'st.reading': '正在读取第 {i}/{n} 张图片',
+    'st.added': '已添加 {n} 面旗帜',
+    'st.failed': '，无法读取：{list}',
+    'st.downloaded': '已下载 hoi4_flags.zip（{n} 个文件）',
+    'st.bulkSet': '已将所有旗帜设为 _{v}',
+    'st.bulkNone': '已移除所有旗帜的后缀',
+    'st.cleared': '已全部清除',
+    'st.saved': '已保存旗帜 {name} 的修改',
+    'st.resetSaved': '旗帜 {name} 已恢复为原始图片',
+    'err.tgaShort': 'TGA 文件过短',
+    'err.tgaType': '不支持此类 TGA',
+    'err.tgaBits': '仅支持 24 位或 32 位 TGA',
+    'err.tgaSize': 'TGA 尺寸为零',
+    'err.tgaBroken': 'TGA 文件不完整',
+    'err.imgRead': '浏览器无法读取此图片',
+    'err.imgSize': '图片尺寸为零',
+    'img.default': '图片',
+    'ed.title': '编辑图层：{name}',
+    'ed.close': '不保存并关闭',
+    'ed.addImg': '添加图片',
+    'ed.addRect': '添加矩形',
+    'ed.addEllipse': '添加椭圆',
+    'ed.undo': '撤销',
+    'ed.redo': '重做',
+    'ed.reset': '从原图重新开始',
+    'ed.stageAria': '旗帜排版区。金色框为旗帜边缘，方向键可移动所选图层。',
+    'ed.hint': '拖动可移动。拖动角点缩放，拖动边中点只拉伸一侧，拖动顶部圆点旋转。按住 Shift 切换锁定比例或以 15° 为步长旋转，按住 Alt 关闭对齐中心和边缘。方向键每次移动大旗的 1 个像素。拖入或粘贴图片即可添加为新图层。',
+    'ed.layers': '图层',
+    'ed.layersSub': '列表最上方的图层在最前面',
+    'ed.selected': '所选图层',
+    'ed.noselect': '在画布上点击图层，或从列表中选择',
+    'ed.x': '位置 X (%)',
+    'ed.y': '位置 Y (%)',
+    'ed.w': '宽度 (%)',
+    'ed.h': '高度 (%)',
+    'ed.rot': '旋转 (°)',
+    'ed.color': '颜色',
+    'ed.lock': '缩放时锁定比例',
+    'ed.opacity': '不透明度',
+    'ed.fitLabel': '在旗帜中排布',
+    'ed.fitStretch': '拉伸',
+    'ed.fitCover': '填满裁切',
+    'ed.fitContain': '完整放入',
+    'ed.fitCenter': '居中',
+    'ed.flipX': '水平翻转',
+    'ed.flipY': '垂直翻转',
+    'ed.dup': '复制',
+    'ed.del': '删除图层',
+    'ed.cancel': '取消',
+    'ed.save': '保存修改',
+    'ed.rectName': '矩形 {n}',
+    'ed.ellipseName': '椭圆 {n}',
+    'ed.copy': '（副本）',
+    'ed.hide': '隐藏 {name}',
+    'ed.show': '显示 {name}',
+    'ed.up': '将 {name} 上移一层',
+    'ed.down': '将 {name} 下移一层',
+    'ed.noLayers': '没有图层。请在上方添加图片或形状。',
+    'ed.dupDone': '已复制 {name}',
+    'ed.delDone': '已删除 {name}，可按“撤销”恢复。',
+    'ed.added': '已添加 {n} 个图层',
+    'ed.resetDone': '已恢复为原图。如需找回之前的图层，请按“撤销”。',
+    'ed.zoomGroup': '缩放',
+    'ed.zoomIn': '放大',
+    'ed.zoomOut': '缩小',
+    'ed.zoomFit': '适应窗口',
+    'ed.zoomHint': '缩放：Ctrl + 鼠标滚轮、Ctrl + / Ctrl −，或在触屏上双指捏合（Ctrl+0 恢复适应窗口）。放大后，可用鼠标滚轮、拖动空白处、按住空格拖动或按住鼠标中键拖动来平移视图。',
+    'legal.oss': '免费开源软件，采用 MIT 许可证发布。© {year} {owner}',
+    'legal.note': '你可以使用、复制、修改和分发，只需在代码中保留许可证声明。',
+  },
+
+  ja: {
+    'title': 'HOI4 用の国旗：リサイズして TGA に変換',
+    'lang.label': '言語',
+    'h1': 'HOI4 の国旗',
+    'lede': '画像を縮小したり、複数の画像をレイヤーとして重ねたりして、ゲームで使う 3 サイズの国旗を作り、MOD にそのまま入れられる 32 ビット .tga に変換します',
+    'sizes.aria': '出力サイズ：82×52、41×26、10×7 ピクセル',
+    'local': 'すべての処理はブラウザー内で行われます。このページはインターネット接続を禁止しているため、ファイルが外部に送られることはありません。コードはすべて「ページのソースを表示」で確認できます。',
+    'drop.title': '国旗の画像をここにドロップ',
+    'drop.hint': 'PNG、JPG、WebP、BMP、GIF、TGA に対応。ファイル名がそのまま国旗の名前になります。Ctrl+V で画像を貼り付けることもできます。',
+    'btn.files': 'ファイルを選択',
+    'btn.folder': 'フォルダーを選択',
+    'mode.legend': '画像の縦横比が国旗と合わないとき',
+    'mode.stretch': '引き伸ばして全体に合わせる',
+    'mode.stretch.sub': '元のプログラムと同じ動作。もともと国旗に近い比率の画像向けです。',
+    'mode.cover': 'はみ出た部分を切り取る',
+    'mode.cover.sub': 'ゆがみません。はみ出た分を両側から同じだけ切り取ります。',
+    'mode.contain': '全体を収めて透明な余白を残す',
+    'mode.contain.sub': '画像全体が見えますが、透明な余白ができることがあります。',
+    'mode.note': 'レイヤー編集で変更した国旗には、この設定は適用されません。',
+    'layout.legend': 'ZIP 内のフォルダー',
+    'layout.mod': 'MOD 用の構成',
+    'layout.mod.sub': '<code>gfx/flags</code> と <code>medium</code>、<code>small</code>。そのまま MOD に解凍できます。',
+    'layout.split': 'サイズ別',
+    'layout.split.sub': '<code>large</code>、<code>medium</code>、<code>small</code>',
+    'list.title': '変換する国旗',
+    'bulk.label': 'すべての国旗のイデオロギー',
+    'bulk.apply': 'すべてに適用',
+    'bulk.clear': 'すべて削除',
+    'list.empty': 'まだ国旗がありません。上から画像を追加するか、ページのどこかにファイルをドロップしてください。',
+    'guide.summary': '使い方と MOD への入れ方',
+    'guide.p1': '各国旗の「レイヤーを編集」を押すとエディターが開きます。複数の画像をレイヤーとして重ねられます。たとえば長方形で色の帯を作り、中央に紋章を置くことができます。各レイヤーは移動、拡大縮小、引き伸ばし、回転、反転、不透明度の調整ができます。エディター内の 3 サイズのプレビューが実際のファイルの見た目です。',
+    'guide.p2': '「MOD 用の構成」の ZIP を解凍し、<code>gfx</code> フォルダーを MOD のフォルダーに入れます。ゲームは大きい国旗を <code>gfx/flags</code>、中サイズを <code>gfx/flags/medium</code>、小サイズを <code>gfx/flags/small</code> から読み込みます。',
+    'guide.p3': 'タグは国タグと同じにする必要があります（例：<code>GER</code>）。イデオロギー別の国旗を作るには「イデオロギー」で選ぶと、名前に <code>_communism</code>、<code>_democratic</code>、<code>_fascism</code>、<code>_neutrality</code> が付きます。接尾辞なしの国旗は、そのイデオロギー用の国旗がないときにゲームが使う標準の国旗です。',
+    'guide.p4': '画像のファイル名がすでに <code>GER_fascism.png</code> のように終わっている場合は、自動でタグ <code>GER</code> とイデオロギー fascism に分けられます。タグ欄に接尾辞を入力しても同じです。',
+    'guide.p5': 'フォルダーごと選ぶと <code>medium</code> と <code>small</code> という名前のサブフォルダーはスキップされます。MOD の既存の <code>gfx/flags</code> を選べば、大きい国旗から全サイズを作り直せます。',
+    'download': 'ZIP をダウンロード',
+    'count.none': '国旗はまだありません',
+    'count.ready': '国旗 {n} 件、ファイル {files} 個',
+    'count.problems': 'ダウンロード前に国旗名を {n} 件修正してください',
+    'row.tag': 'タグ',
+    'row.ideo': 'イデオロギー',
+    'row.out': '出力ファイル',
+    'row.edit': 'レイヤーを編集',
+    'row.remove': '削除',
+    'row.from': '{file}（{w}×{h}）から',
+    'row.edited': '編集済み（レイヤー {n} 枚）',
+    'row.noName': '名前なし',
+    'row.unnamed': '（名前なし）',
+    'row.removeAria': '国旗 {name} を削除',
+    'row.editAria': '国旗 {name} のレイヤーを編集',
+    'err.noName': 'ダウンロード前にタグを入力してください',
+    'err.dup': 'ほかの国旗と同じ名前です。タグかイデオロギーを変えないとファイルが上書きされます。',
+    'ideo.none': '接尾辞なし',
+    'ideo.communism': '共産主義',
+    'ideo.democratic': '民主主義',
+    'ideo.fascism': 'ファシズム',
+    'ideo.neutrality': '非同盟',
+    'st.removed': '{name} を削除しました',
+    'st.noImages': '対応している画像ファイルが見つかりません',
+    'st.reading': '画像を読み込み中 {i}/{n}',
+    'st.added': '国旗を {n} 件追加しました',
+    'st.failed': '。読み込めませんでした：{list}',
+    'st.downloaded': 'hoi4_flags.zip をダウンロードしました（{n} ファイル）',
+    'st.bulkSet': 'すべての国旗を _{v} にしました',
+    'st.bulkNone': 'すべての国旗から接尾辞を外しました',
+    'st.cleared': 'すべて削除しました',
+    'st.saved': '国旗 {name} の変更を保存しました',
+    'st.resetSaved': '国旗 {name} を元の画像に戻しました',
+    'err.tgaShort': 'TGA ファイルが短すぎます',
+    'err.tgaType': 'この種類の TGA には対応していません',
+    'err.tgaBits': '24 ビットまたは 32 ビットの TGA のみ対応しています',
+    'err.tgaSize': 'TGA のサイズが 0 です',
+    'err.tgaBroken': 'TGA ファイルが壊れています',
+    'err.imgRead': 'ブラウザーがこの画像を読み込めません',
+    'err.imgSize': '画像のサイズが 0 です',
+    'img.default': '画像',
+    'ed.title': 'レイヤー編集：{name}',
+    'ed.close': '保存せずに閉じる',
+    'ed.addImg': '画像を追加',
+    'ed.addRect': '長方形を追加',
+    'ed.addEllipse': '楕円を追加',
+    'ed.undo': '元に戻す',
+    'ed.redo': 'やり直す',
+    'ed.reset': '元の画像からやり直す',
+    'ed.stageAria': '国旗の配置エリア。金色の枠が国旗の端です。矢印キーで選択中のレイヤーを動かせます。',
+    'ed.hint': 'ドラッグで移動。角をドラッグで拡大縮小、辺の中点で片側だけ引き伸ばし、上の丸いハンドルで回転します。Shift を押しながらで縦横比ロックの切り替えや 15° 単位の回転、Alt を押しながらで中央や端への吸着をオフにできます。矢印キーで大きい国旗の 1 ピクセルずつ動かせます。画像をドロップまたは貼り付けると新しいレイヤーになります。',
+    'ed.layers': 'レイヤー',
+    'ed.layersSub': 'リストの一番上が最前面',
+    'ed.selected': '選択中のレイヤー',
+    'ed.noselect': 'キャンバス上のレイヤーをクリックするか、リストから選んでください',
+    'ed.x': '位置 X (%)',
+    'ed.y': '位置 Y (%)',
+    'ed.w': '幅 (%)',
+    'ed.h': '高さ (%)',
+    'ed.rot': '回転 (°)',
+    'ed.color': '色',
+    'ed.lock': '拡大縮小時に縦横比を保つ',
+    'ed.opacity': '不透明度',
+    'ed.fitLabel': '国旗に合わせる',
+    'ed.fitStretch': '引き伸ばす',
+    'ed.fitCover': '埋めて切り取る',
+    'ed.fitContain': '全体を収める',
+    'ed.fitCenter': '中央',
+    'ed.flipX': '左右反転',
+    'ed.flipY': '上下反転',
+    'ed.dup': '複製',
+    'ed.del': 'レイヤーを削除',
+    'ed.cancel': 'キャンセル',
+    'ed.save': '変更を保存',
+    'ed.rectName': '長方形 {n}',
+    'ed.ellipseName': '楕円 {n}',
+    'ed.copy': '（コピー）',
+    'ed.hide': '{name} を非表示',
+    'ed.show': '{name} を表示',
+    'ed.up': '{name} を前面へ',
+    'ed.down': '{name} を背面へ',
+    'ed.noLayers': 'レイヤーがありません。上から画像か図形を追加してください。',
+    'ed.dupDone': '{name} を複製しました',
+    'ed.delDone': '{name} を削除しました。「元に戻す」で戻せます。',
+    'ed.added': 'レイヤーを {n} 枚追加しました',
+    'ed.resetDone': '元の画像に戻しました。前のレイヤーに戻すには「元に戻す」を押してください。',
+    'ed.zoomGroup': 'ズーム',
+    'ed.zoomIn': '拡大',
+    'ed.zoomOut': '縮小',
+    'ed.zoomFit': '全体表示',
+    'ed.zoomHint': 'Ctrl + マウスホイール、Ctrl + / Ctrl −、または 2 本指のピンチでズームできます（Ctrl+0 で全体表示に戻ります）。拡大中は、マウスホイール、空いている場所のドラッグ、Space を押しながらのドラッグ、マウス中ボタンで表示位置を動かせます。',
+    'legal.oss': 'MIT ライセンスで公開しているフリーのオープンソースソフトウェアです。© {year} {owner}',
+    'legal.note': 'ライセンス表記をコードに残せば、自由に使用・複製・改変・再配布できます。',
+  },
+
+  de: {
+    'title': 'HOI4-Flaggen: skalieren und in TGA umwandeln',
+    'lang.label': 'Sprache',
+    'h1': 'Flaggen für HOI4',
+    'lede': 'Ein Bild verkleinern oder mehrere als Ebenen übereinanderlegen, in die drei Flaggengrößen des Spiels bringen und als 32-Bit-.tga für deine Mod speichern',
+    'sizes.aria': 'Ausgabegrößen: 82×52, 41×26 und 10×7 Pixel',
+    'local': 'Alles läuft in deinem Browser. Diese Seite darf keine Internetverbindung aufbauen, deine Dateien verlassen also nie deinen Rechner, und den gesamten Code kannst du über „Seitenquelltext anzeigen“ lesen.',
+    'drop.title': 'Flaggenbilder hier ablegen',
+    'drop.hint': 'Unterstützt PNG, JPG, WebP, BMP, GIF und TGA. Der Dateiname wird zum Flaggennamen. Bilder lassen sich auch mit Strg+V einfügen.',
+    'btn.files': 'Dateien wählen',
+    'btn.folder': 'Ordner wählen',
+    'mode.legend': 'Wenn das Seitenverhältnis nicht zur Flagge passt',
+    'mode.stretch': 'Strecken und füllen',
+    'mode.stretch.sub': 'Wie im Originalprogramm. Ideal, wenn das Bild schon fast Flaggenproportionen hat.',
+    'mode.cover': 'Überstand abschneiden',
+    'mode.cover.sub': 'Ohne Verzerrung, auf beiden Seiten wird gleich viel entfernt.',
+    'mode.contain': 'Einpassen mit transparentem Rand',
+    'mode.contain.sub': 'Das ganze Bild bleibt sichtbar, eventuell mit transparenten Rändern.',
+    'mode.note': 'Im Ebenen-Editor bearbeitete Flaggen sind davon nicht betroffen.',
+    'layout.legend': 'Ordner im ZIP',
+    'layout.mod': 'Mod-Struktur',
+    'layout.mod.sub': '<code>gfx/flags</code> mit <code>medium</code> und <code>small</code>, direkt in die Mod entpacken.',
+    'layout.split': 'Nach Größe getrennt',
+    'list.title': 'Zu konvertierende Flaggen',
+    'bulk.label': 'Ideologie für alle Flaggen',
+    'bulk.apply': 'Auf alle anwenden',
+    'bulk.clear': 'Alle entfernen',
+    'list.empty': 'Noch keine Flaggen. Füge oben Bilder hinzu oder lege Dateien irgendwo auf der Seite ab.',
+    'guide.summary': 'Anleitung und Einbau in die Mod',
+    'guide.p1': 'Klicke bei einer Flagge auf „Ebenen bearbeiten“, um den Editor zu öffnen. Du kannst mehrere Bilder als Ebenen stapeln, zum Beispiel Rechtecke als Farbstreifen und ein Wappen in der Mitte. Jede Ebene lässt sich verschieben, skalieren, strecken, drehen, spiegeln und transparent machen. Die drei Vorschauen im Editor zeigen genau, wie die Dateien aussehen werden.',
+    'guide.p2': 'Entpacke das ZIP mit Mod-Struktur und lege den Ordner <code>gfx</code> in deinen Mod-Ordner. Das Spiel liest große Flaggen aus <code>gfx/flags</code>, mittlere aus <code>gfx/flags/medium</code> und kleine aus <code>gfx/flags/small</code>.',
+    'guide.p3': 'Der Tag muss dem Ländertag entsprechen, zum Beispiel <code>GER</code>. Für ideologiespezifische Flaggen wählst du eine Ideologie, dann wird <code>_communism</code>, <code>_democratic</code>, <code>_fascism</code> oder <code>_neutrality</code> an den Namen angehängt. Eine Flagge ohne Suffix nutzt das Spiel, wenn es keine Flagge für die jeweilige Ideologie findet.',
+    'guide.p4': 'Endet der Dateiname schon so, etwa <code>GER_fascism.png</code>, wird er automatisch in den Tag <code>GER</code> und die Ideologie fascism aufgeteilt. Dasselbe passiert, wenn du das Suffix ins Tag-Feld tippst.',
+    'guide.p5': 'Beim Auswählen eines Ordners werden Unterordner namens <code>medium</code> und <code>small</code> übersprungen. So kannst du den vorhandenen <code>gfx/flags</code>-Ordner deiner Mod wählen und alle Größen aus den großen Flaggen neu erzeugen.',
+    'download': 'ZIP herunterladen',
+    'count.none': 'Noch keine Flaggen',
+    'count.ready': { one: '{n} Flagge, {files} Dateien', other: '{n} Flaggen, {files} Dateien' },
+    'count.problems': { one: 'Korrigiere vor dem Download 1 Flaggennamen', other: 'Korrigiere vor dem Download {n} Flaggennamen' },
+    'row.tag': 'Tag',
+    'row.ideo': 'Ideologie',
+    'row.out': 'Datei',
+    'row.edit': 'Ebenen bearbeiten',
+    'row.remove': 'Entfernen',
+    'row.from': 'Aus {file} ({w}×{h})',
+    'row.edited': { one: 'Bearbeitet, 1 Ebene', other: 'Bearbeitet, {n} Ebenen' },
+    'row.noName': 'noch kein Name',
+    'row.unnamed': '(ohne Namen)',
+    'row.removeAria': 'Flagge {name} entfernen',
+    'row.editAria': 'Ebenen der Flagge {name} bearbeiten',
+    'err.noName': 'Gib vor dem Download einen Tag ein',
+    'err.dup': 'Eine andere Flagge hat denselben Namen. Ändere Tag oder Ideologie, sonst überschreiben sich die Dateien.',
+    'ideo.none': 'Kein Suffix',
+    'ideo.communism': 'Kommunismus',
+    'ideo.democratic': 'Demokratie',
+    'ideo.fascism': 'Faschismus',
+    'ideo.neutrality': 'Blockfrei',
+    'st.removed': '{name} entfernt',
+    'st.noImages': 'Keine unterstützten Bilddateien gefunden',
+    'st.reading': 'Lese Bild {i} von {n}',
+    'st.added': { one: '1 Flagge hinzugefügt', other: '{n} Flaggen hinzugefügt' },
+    'st.failed': '; nicht lesbar: {list}',
+    'st.downloaded': 'hoi4_flags.zip heruntergeladen ({n} Dateien)',
+    'st.bulkSet': 'Alle Flaggen auf _{v} gesetzt',
+    'st.bulkNone': 'Suffix bei allen Flaggen entfernt',
+    'st.cleared': 'Alle Flaggen entfernt',
+    'st.saved': 'Änderungen an Flagge {name} gespeichert',
+    'st.resetSaved': 'Flagge {name} nutzt wieder das Originalbild',
+    'err.tgaShort': 'TGA-Datei ist zu kurz',
+    'err.tgaType': 'Diese TGA-Art wird nicht unterstützt',
+    'err.tgaBits': 'Nur 24- oder 32-Bit-TGA wird unterstützt',
+    'err.tgaSize': 'TGA hat keine Größe',
+    'err.tgaBroken': 'TGA-Datei ist unvollständig',
+    'err.imgRead': 'Der Browser kann dieses Bild nicht lesen',
+    'err.imgSize': 'Bild hat keine Größe',
+    'img.default': 'Bild',
+    'ed.title': 'Ebenen bearbeiten: {name}',
+    'ed.close': 'Ohne Speichern schließen',
+    'ed.addImg': 'Bild hinzufügen',
+    'ed.addRect': 'Rechteck hinzufügen',
+    'ed.addEllipse': 'Ellipse hinzufügen',
+    'ed.undo': 'Rückgängig',
+    'ed.redo': 'Wiederholen',
+    'ed.reset': 'Mit dem Original neu beginnen',
+    'ed.stageAria': 'Gestaltungsfläche der Flagge. Der goldene Rahmen ist der Flaggenrand. Mit den Pfeiltasten verschiebst du die gewählte Ebene.',
+    'ed.hint': 'Ziehen zum Verschieben. Eine Ecke skaliert, ein Seitengriff streckt eine Seite, der runde Griff oben dreht. Shift halten schaltet das Seitenverhältnis um oder dreht in 15°-Schritten, Alt halten schaltet das Einrasten an Mitte und Rändern aus. Pfeiltasten verschieben um 1 Pixel der großen Flagge. Bilder ablegen oder einfügen, um sie als neue Ebene hinzuzufügen.',
+    'ed.layers': 'Ebenen',
+    'ed.layersSub': 'Oben in der Liste ist vorne',
+    'ed.selected': 'Gewählte Ebene',
+    'ed.noselect': 'Klicke auf eine Ebene in der Fläche oder wähle sie in der Liste',
+    'ed.x': 'Position X (%)',
+    'ed.y': 'Position Y (%)',
+    'ed.w': 'Breite (%)',
+    'ed.h': 'Höhe (%)',
+    'ed.rot': 'Drehung (°)',
+    'ed.color': 'Farbe',
+    'ed.lock': 'Seitenverhältnis beim Skalieren beibehalten',
+    'ed.opacity': 'Deckkraft',
+    'ed.fitLabel': 'In die Flagge einpassen',
+    'ed.fitStretch': 'Strecken',
+    'ed.fitCover': 'Füllen',
+    'ed.fitContain': 'Einpassen',
+    'ed.fitCenter': 'Zentrieren',
+    'ed.flipX': 'Horizontal spiegeln',
+    'ed.flipY': 'Vertikal spiegeln',
+    'ed.dup': 'Duplizieren',
+    'ed.del': 'Ebene löschen',
+    'ed.cancel': 'Abbrechen',
+    'ed.save': 'Änderungen speichern',
+    'ed.rectName': 'Rechteck {n}',
+    'ed.ellipseName': 'Ellipse {n}',
+    'ed.copy': '(Kopie)',
+    'ed.hide': '{name} ausblenden',
+    'ed.show': '{name} einblenden',
+    'ed.up': '{name} nach vorn',
+    'ed.down': '{name} nach hinten',
+    'ed.noLayers': 'Keine Ebenen. Füge oben ein Bild oder eine Form hinzu.',
+    'ed.dupDone': '{name} dupliziert',
+    'ed.delDone': '{name} gelöscht. Mit „Rückgängig“ holst du es zurück.',
+    'ed.added': { one: '1 Ebene hinzugefügt', other: '{n} Ebenen hinzugefügt' },
+    'ed.resetDone': 'Zurück zum Originalbild. Mit „Rückgängig“ bekommst du deine Ebenen zurück.',
+    'ed.zoomGroup': 'Zoom',
+    'ed.zoomIn': 'Vergrößern',
+    'ed.zoomOut': 'Verkleinern',
+    'ed.zoomFit': 'Alles zeigen',
+    'ed.zoomHint': 'Zoomen mit Strg + Mausrad, Strg + / Strg − oder Zwei-Finger-Geste (Strg+0 zeigt wieder alles). Beim Zoomen verschiebst du die Ansicht mit dem Mausrad, durch Ziehen einer leeren Stelle, mit gedrückter Leertaste oder mit der mittleren Maustaste.',
+    'legal.oss': 'Freie Open-Source-Software unter der MIT-Lizenz. © {year} {owner}',
+    'legal.note': 'Du darfst sie nutzen, kopieren, ändern und weitergeben, solange der Lizenzhinweis beim Code bleibt.',
+  },
+
+  es: {
+    'title': 'Banderas para HOI4: redimensionar y convertir a TGA',
+    'lang.label': 'Idioma',
+    'h1': 'Banderas para HOI4',
+    'lede': 'Redimensiona una imagen o apila varias como capas en los tres tamaños de bandera que usa el juego, y conviértelas en archivos .tga de 32 bits listos para tu mod',
+    'sizes.aria': 'Tamaños de salida: 82×52, 41×26 y 10×7 píxeles',
+    'local': 'Todo se ejecuta en tu navegador. Esta página tiene bloqueada cualquier conexión a internet, así que tus archivos nunca salen de tu equipo, y puedes leer todo su código con «Ver código fuente».',
+    'drop.title': 'Suelta aquí las imágenes de banderas',
+    'drop.hint': 'Admite PNG, JPG, WebP, BMP, GIF y TGA. El nombre del archivo será el nombre de la bandera. También puedes pegar una imagen con Ctrl+V.',
+    'btn.files': 'Elegir archivos',
+    'btn.folder': 'Elegir carpeta',
+    'mode.legend': 'Si la imagen no tiene las proporciones de la bandera',
+    'mode.stretch': 'Estirar para llenar',
+    'mode.stretch.sub': 'Igual que el programa original. Ideal si la imagen ya tiene proporciones parecidas.',
+    'mode.cover': 'Recortar lo que sobra',
+    'mode.cover.sub': 'Sin deformar. Recorta lo mismo por ambos lados.',
+    'mode.contain': 'Encajar con márgenes transparentes',
+    'mode.contain.sub': 'Se ve la imagen completa, pero puede quedar borde transparente.',
+    'mode.note': 'Las banderas editadas en el editor de capas no cambian con esta opción.',
+    'layout.legend': 'Carpetas dentro del ZIP',
+    'layout.mod': 'Estructura de mod',
+    'layout.mod.sub': '<code>gfx/flags</code> con <code>medium</code> y <code>small</code>. Descomprime directamente en tu mod.',
+    'layout.split': 'Una carpeta por tamaño',
+    'list.title': 'Banderas para convertir',
+    'bulk.label': 'Ideología para todas',
+    'bulk.apply': 'Aplicar a todas',
+    'bulk.clear': 'Quitar todas',
+    'list.empty': 'Aún no hay banderas. Añade imágenes arriba o suelta archivos en cualquier parte de la página.',
+    'guide.summary': 'Cómo usarlo y añadir las banderas a tu mod',
+    'guide.p1': 'Pulsa «Editar capas» en cualquier bandera para abrir el editor. Puedes apilar varias imágenes como capas, por ejemplo rectángulos como franjas de color con un escudo en el centro. Cada capa se puede mover, escalar, estirar, girar, voltear y volver transparente. Las tres vistas previas del editor muestran exactamente cómo quedarán los archivos.',
+    'guide.p2': 'Descomprime el ZIP con estructura de mod y coloca la carpeta <code>gfx</code> dentro de la carpeta de tu mod. El juego lee las banderas grandes de <code>gfx/flags</code>, las medianas de <code>gfx/flags/medium</code> y las pequeñas de <code>gfx/flags/small</code>.',
+    'guide.p3': 'La etiqueta debe coincidir con la del país, por ejemplo <code>GER</code>. Para banderas según ideología, elige una en «Ideología» y se añadirá <code>_communism</code>, <code>_democratic</code>, <code>_fascism</code> o <code>_neutrality</code> al nombre. La bandera sin sufijo es la que usa el juego cuando no encuentra una para esa ideología.',
+    'guide.p4': 'Si el nombre del archivo ya termina así, como <code>GER_fascism.png</code>, se separa automáticamente en la etiqueta <code>GER</code> y la ideología fascism. Escribir el sufijo en la casilla de la etiqueta funciona igual.',
+    'guide.p5': 'Al elegir una carpeta completa se omiten las subcarpetas <code>medium</code> y <code>small</code>, así que puedes elegir la carpeta <code>gfx/flags</code> de tu mod y regenerar todos los tamaños a partir de las banderas grandes.',
+    'download': 'Descargar ZIP',
+    'count.none': 'Aún no hay banderas',
+    'count.ready': { one: '{n} bandera, {files} archivos', other: '{n} banderas, {files} archivos' },
+    'count.problems': { one: 'Corrige 1 nombre antes de descargar', other: 'Corrige {n} nombres antes de descargar' },
+    'row.tag': 'Etiqueta',
+    'row.ideo': 'Ideología',
+    'row.out': 'Archivo',
+    'row.edit': 'Editar capas',
+    'row.remove': 'Quitar',
+    'row.from': 'De {file} ({w}×{h})',
+    'row.edited': { one: 'Editada, 1 capa', other: 'Editada, {n} capas' },
+    'row.noName': 'sin nombre',
+    'row.unnamed': '(sin nombre)',
+    'row.removeAria': 'Quitar la bandera {name}',
+    'row.editAria': 'Editar capas de la bandera {name}',
+    'err.noName': 'Escribe una etiqueta antes de descargar',
+    'err.dup': 'Otra bandera tiene el mismo nombre. Cambia la etiqueta o la ideología o los archivos se sobrescribirán.',
+    'ideo.none': 'Sin sufijo',
+    'ideo.communism': 'comunismo',
+    'ideo.democratic': 'democracia',
+    'ideo.fascism': 'fascismo',
+    'ideo.neutrality': 'no alineado',
+    'st.removed': 'Se quitó {name}',
+    'st.noImages': 'No se encontraron imágenes compatibles',
+    'st.reading': 'Leyendo imagen {i} de {n}',
+    'st.added': { one: 'Se añadió 1 bandera', other: 'Se añadieron {n} banderas' },
+    'st.failed': '; no se pudo leer: {list}',
+    'st.downloaded': 'Se descargó hoi4_flags.zip ({n} archivos)',
+    'st.bulkSet': 'Todas las banderas ahora usan _{v}',
+    'st.bulkNone': 'Se quitó el sufijo de todas las banderas',
+    'st.cleared': 'Se quitaron todas las banderas',
+    'st.saved': 'Se guardaron los cambios de la bandera {name}',
+    'st.resetSaved': 'La bandera {name} volvió a la imagen original',
+    'err.tgaShort': 'El archivo TGA es demasiado corto',
+    'err.tgaType': 'Este tipo de TGA no es compatible',
+    'err.tgaBits': 'Solo se admiten TGA de 24 o 32 bits',
+    'err.tgaSize': 'El TGA no tiene tamaño',
+    'err.tgaBroken': 'El archivo TGA está incompleto',
+    'err.imgRead': 'El navegador no puede leer esta imagen',
+    'err.imgSize': 'La imagen no tiene tamaño',
+    'img.default': 'imagen',
+    'ed.title': 'Editar capas: {name}',
+    'ed.close': 'Cerrar sin guardar',
+    'ed.addImg': 'Añadir imagen',
+    'ed.addRect': 'Añadir rectángulo',
+    'ed.addEllipse': 'Añadir elipse',
+    'ed.undo': 'Deshacer',
+    'ed.redo': 'Rehacer',
+    'ed.reset': 'Empezar de nuevo con el original',
+    'ed.stageAria': 'Área de diseño de la bandera. El marco dorado es el borde. Usa las flechas para mover la capa seleccionada.',
+    'ed.hint': 'Arrastra para mover. Arrastra una esquina para escalar, un lateral para estirar un solo lado y el círculo de arriba para girar. Mantén Shift para alternar el bloqueo de proporción o girar de 15° en 15°, y Alt para desactivar el ajuste al centro y los bordes. Las flechas mueven 1 píxel de la bandera grande. Suelta o pega imágenes para añadirlas como capas nuevas.',
+    'ed.layers': 'Capas',
+    'ed.layersSub': 'La primera de la lista va al frente',
+    'ed.selected': 'Capa seleccionada',
+    'ed.noselect': 'Haz clic en una capa del lienzo o elígela en la lista',
+    'ed.x': 'Posición X (%)',
+    'ed.y': 'Posición Y (%)',
+    'ed.w': 'Ancho (%)',
+    'ed.h': 'Alto (%)',
+    'ed.rot': 'Giro (°)',
+    'ed.color': 'Color',
+    'ed.lock': 'Mantener proporción al escalar',
+    'ed.opacity': 'Opacidad',
+    'ed.fitLabel': 'Ajustar a la bandera',
+    'ed.fitStretch': 'Estirar',
+    'ed.fitCover': 'Rellenar',
+    'ed.fitContain': 'Encajar',
+    'ed.fitCenter': 'Centrar',
+    'ed.flipX': 'Voltear horizontal',
+    'ed.flipY': 'Voltear vertical',
+    'ed.dup': 'Duplicar',
+    'ed.del': 'Eliminar capa',
+    'ed.cancel': 'Cancelar',
+    'ed.save': 'Guardar cambios',
+    'ed.rectName': 'Rectángulo {n}',
+    'ed.ellipseName': 'Elipse {n}',
+    'ed.copy': '(copia)',
+    'ed.hide': 'Ocultar {name}',
+    'ed.show': 'Mostrar {name}',
+    'ed.up': 'Traer {name} adelante',
+    'ed.down': 'Enviar {name} atrás',
+    'ed.noLayers': 'No hay capas. Añade una imagen o una forma arriba.',
+    'ed.dupDone': 'Se duplicó {name}',
+    'ed.delDone': 'Se eliminó {name}. Pulsa «Deshacer» para recuperarla.',
+    'ed.added': { one: 'Se añadió 1 capa', other: 'Se añadieron {n} capas' },
+    'ed.resetDone': 'Se volvió a la imagen original. Pulsa «Deshacer» para recuperar tus capas.',
+    'ed.zoomGroup': 'Zoom',
+    'ed.zoomIn': 'Acercar',
+    'ed.zoomOut': 'Alejar',
+    'ed.zoomFit': 'Ver todo',
+    'ed.zoomHint': 'Haz zoom con Ctrl + rueda del ratón, Ctrl + / Ctrl − o pellizcando con dos dedos (Ctrl+0 vuelve a ver todo). Con zoom, desplaza la vista con la rueda, arrastrando una zona vacía, manteniendo Espacio y arrastrando, o con el botón central del ratón.',
+    'legal.oss': 'Software libre y de código abierto bajo la licencia MIT. © {year} {owner}',
+    'legal.note': 'Puedes usarlo, copiarlo, modificarlo y compartirlo siempre que el aviso de licencia acompañe al código.',
+  },
+
+  pt: {
+    'title': 'Bandeiras para HOI4: redimensionar e converter para TGA',
+    'lang.label': 'Idioma',
+    'h1': 'Bandeiras para HOI4',
+    'lede': 'Redimensione uma imagem ou empilhe várias como camadas nos três tamanhos de bandeira usados pelo jogo e converta para arquivos .tga de 32 bits prontos para o seu mod',
+    'sizes.aria': 'Tamanhos de saída: 82×52, 41×26 e 10×7 pixels',
+    'local': 'Tudo roda no seu navegador. Esta página está bloqueada para qualquer conexão com a internet, então seus arquivos nunca saem do computador, e você pode ler todo o código com “Exibir código-fonte”.',
+    'drop.title': 'Solte aqui as imagens das bandeiras',
+    'drop.hint': 'Aceita PNG, JPG, WebP, BMP, GIF e TGA. O nome do arquivo vira o nome da bandeira. Também dá para colar uma imagem com Ctrl+V.',
+    'btn.files': 'Escolher arquivos',
+    'btn.folder': 'Escolher pasta',
+    'mode.legend': 'Se a imagem não tiver as proporções da bandeira',
+    'mode.stretch': 'Esticar para preencher',
+    'mode.stretch.sub': 'Igual ao programa original. Ideal se a imagem já tem proporções parecidas.',
+    'mode.cover': 'Cortar o excesso',
+    'mode.cover.sub': 'Sem distorção. Corta a mesma quantidade dos dois lados.',
+    'mode.contain': 'Encaixar com margens transparentes',
+    'mode.contain.sub': 'A imagem inteira fica visível, mas pode sobrar borda transparente.',
+    'mode.note': 'Bandeiras editadas no editor de camadas não mudam com esta opção.',
+    'layout.legend': 'Pastas dentro do ZIP',
+    'layout.mod': 'Estrutura de mod',
+    'layout.mod.sub': '<code>gfx/flags</code> com <code>medium</code> e <code>small</code>. Descompacte direto no seu mod.',
+    'layout.split': 'Uma pasta por tamanho',
+    'list.title': 'Bandeiras para converter',
+    'bulk.label': 'Ideologia para todas',
+    'bulk.apply': 'Aplicar a todas',
+    'bulk.clear': 'Remover todas',
+    'list.empty': 'Ainda não há bandeiras. Adicione imagens acima ou solte arquivos em qualquer lugar da página.',
+    'guide.summary': 'Como usar e colocar as bandeiras no mod',
+    'guide.p1': 'Clique em “Editar camadas” em qualquer bandeira para abrir o editor. Dá para empilhar várias imagens como camadas, por exemplo retângulos como faixas coloridas com um brasão no centro. Cada camada pode ser movida, redimensionada, esticada, girada, espelhada e ficar transparente. As três prévias no editor mostram exatamente como os arquivos vão ficar.',
+    'guide.p2': 'Descompacte o ZIP com estrutura de mod e coloque a pasta <code>gfx</code> dentro da pasta do seu mod. O jogo lê as bandeiras grandes de <code>gfx/flags</code>, as médias de <code>gfx/flags/medium</code> e as pequenas de <code>gfx/flags/small</code>.',
+    'guide.p3': 'A tag precisa ser igual à tag do país, como <code>GER</code>. Para bandeiras por ideologia, escolha uma em “Ideologia” e <code>_communism</code>, <code>_democratic</code>, <code>_fascism</code> ou <code>_neutrality</code> será adicionado ao nome. A bandeira sem sufixo é a que o jogo usa quando não encontra uma para aquela ideologia.',
+    'guide.p4': 'Se o nome do arquivo já termina assim, como <code>GER_fascism.png</code>, ele é separado automaticamente na tag <code>GER</code> e na ideologia fascism. Digitar o sufixo no campo da tag funciona do mesmo jeito.',
+    'guide.p5': 'Ao escolher uma pasta inteira, as subpastas <code>medium</code> e <code>small</code> são ignoradas, então você pode escolher a pasta <code>gfx/flags</code> do seu mod e refazer todos os tamanhos a partir das bandeiras grandes.',
+    'download': 'Baixar ZIP',
+    'count.none': 'Ainda não há bandeiras',
+    'count.ready': { one: '{n} bandeira, {files} arquivos', other: '{n} bandeiras, {files} arquivos' },
+    'count.problems': { one: 'Corrija 1 nome antes de baixar', other: 'Corrija {n} nomes antes de baixar' },
+    'row.tag': 'Tag',
+    'row.ideo': 'Ideologia',
+    'row.out': 'Arquivo',
+    'row.edit': 'Editar camadas',
+    'row.remove': 'Remover',
+    'row.from': 'De {file} ({w}×{h})',
+    'row.edited': { one: 'Editada, 1 camada', other: 'Editada, {n} camadas' },
+    'row.noName': 'sem nome',
+    'row.unnamed': '(sem nome)',
+    'row.removeAria': 'Remover a bandeira {name}',
+    'row.editAria': 'Editar camadas da bandeira {name}',
+    'err.noName': 'Digite uma tag antes de baixar',
+    'err.dup': 'Outra bandeira tem o mesmo nome. Mude a tag ou a ideologia, senão os arquivos vão se sobrescrever.',
+    'ideo.none': 'Sem sufixo',
+    'ideo.communism': 'comunismo',
+    'ideo.democratic': 'democracia',
+    'ideo.fascism': 'fascismo',
+    'ideo.neutrality': 'não alinhado',
+    'st.removed': 'Bandeira {name} removida',
+    'st.noImages': 'Nenhuma imagem compatível encontrada',
+    'st.reading': 'Lendo imagem {i} de {n}',
+    'st.added': { one: '1 bandeira adicionada', other: '{n} bandeiras adicionadas' },
+    'st.failed': '; não foi possível ler: {list}',
+    'st.downloaded': 'hoi4_flags.zip baixado ({n} arquivos)',
+    'st.bulkSet': 'Todas as bandeiras agora usam _{v}',
+    'st.bulkNone': 'Sufixo removido de todas as bandeiras',
+    'st.cleared': 'Todas as bandeiras removidas',
+    'st.saved': 'Alterações da bandeira {name} salvas',
+    'st.resetSaved': 'A bandeira {name} voltou à imagem original',
+    'err.tgaShort': 'O arquivo TGA é curto demais',
+    'err.tgaType': 'Este tipo de TGA não é compatível',
+    'err.tgaBits': 'Só TGA de 24 ou 32 bits é aceito',
+    'err.tgaSize': 'O TGA não tem tamanho',
+    'err.tgaBroken': 'O arquivo TGA está incompleto',
+    'err.imgRead': 'O navegador não consegue ler esta imagem',
+    'err.imgSize': 'A imagem não tem tamanho',
+    'img.default': 'imagem',
+    'ed.title': 'Editar camadas: {name}',
+    'ed.close': 'Fechar sem salvar',
+    'ed.addImg': 'Adicionar imagem',
+    'ed.addRect': 'Adicionar retângulo',
+    'ed.addEllipse': 'Adicionar elipse',
+    'ed.undo': 'Desfazer',
+    'ed.redo': 'Refazer',
+    'ed.reset': 'Recomeçar com o original',
+    'ed.stageAria': 'Área de montagem da bandeira. A moldura dourada é a borda. Use as setas para mover a camada selecionada.',
+    'ed.hint': 'Arraste para mover. Arraste um canto para redimensionar, uma lateral para esticar um só lado e o círculo de cima para girar. Segure Shift para alternar o travamento de proporção ou girar de 15° em 15°, e Alt para desligar o alinhamento ao centro e às bordas. As setas movem 1 pixel da bandeira grande. Solte ou cole imagens para adicioná-las como novas camadas.',
+    'ed.layers': 'Camadas',
+    'ed.layersSub': 'A primeira da lista fica na frente',
+    'ed.selected': 'Camada selecionada',
+    'ed.noselect': 'Clique numa camada na área de montagem ou escolha na lista',
+    'ed.x': 'Posição X (%)',
+    'ed.y': 'Posição Y (%)',
+    'ed.w': 'Largura (%)',
+    'ed.h': 'Altura (%)',
+    'ed.rot': 'Rotação (°)',
+    'ed.color': 'Cor',
+    'ed.lock': 'Manter proporção ao redimensionar',
+    'ed.opacity': 'Opacidade',
+    'ed.fitLabel': 'Ajustar à bandeira',
+    'ed.fitStretch': 'Esticar',
+    'ed.fitCover': 'Preencher',
+    'ed.fitContain': 'Encaixar',
+    'ed.fitCenter': 'Centralizar',
+    'ed.flipX': 'Espelhar horizontal',
+    'ed.flipY': 'Espelhar vertical',
+    'ed.dup': 'Duplicar',
+    'ed.del': 'Excluir camada',
+    'ed.cancel': 'Cancelar',
+    'ed.save': 'Salvar alterações',
+    'ed.rectName': 'Retângulo {n}',
+    'ed.ellipseName': 'Elipse {n}',
+    'ed.copy': '(cópia)',
+    'ed.hide': 'Ocultar {name}',
+    'ed.show': 'Mostrar {name}',
+    'ed.up': 'Trazer {name} para frente',
+    'ed.down': 'Enviar {name} para trás',
+    'ed.noLayers': 'Nenhuma camada. Adicione uma imagem ou forma acima.',
+    'ed.dupDone': '{name} duplicada',
+    'ed.delDone': '{name} excluída. Clique em “Desfazer” para recuperar.',
+    'ed.added': { one: '1 camada adicionada', other: '{n} camadas adicionadas' },
+    'ed.resetDone': 'De volta à imagem original. Clique em “Desfazer” para recuperar suas camadas.',
+    'ed.zoomGroup': 'Zoom',
+    'ed.zoomIn': 'Aproximar',
+    'ed.zoomOut': 'Afastar',
+    'ed.zoomFit': 'Ver tudo',
+    'ed.zoomHint': 'Use Ctrl + roda do mouse, Ctrl + / Ctrl − ou pinça com dois dedos para dar zoom (Ctrl+0 volta a ver tudo). Com zoom, mova a vista com a roda do mouse, arrastando uma área vazia, segurando Espaço e arrastando, ou com o botão do meio do mouse.',
+    'legal.oss': 'Software livre e de código aberto sob a licença MIT. © {year} {owner}',
+    'legal.note': 'Você pode usar, copiar, modificar e compartilhar, desde que o aviso de licença acompanhe o código.',
+  },
+};
+
+let lang = 'en';
+const pluralRules = {};
+function t(key, vars = {}) {
+  vars = { owner: OWNER, year: COPYRIGHT_YEAR, ...vars };
+  let v = I18N[lang]?.[key] ?? I18N.en[key] ?? I18N.th[key] ?? key;
+  if (typeof v === 'object') {
+    const pr = pluralRules[lang] || (pluralRules[lang] = new Intl.PluralRules(HTML_LANG[lang]));
+    v = v[pr.select(vars.n ?? 0)] ?? v.other;
+  }
+  return v.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+}
+const hasKey = (key) => key in I18N[lang] || key in I18N.en;
+// ข้อผิดพลาดจากการอ่านไฟล์ส่งมาเป็นรหัส แปลตอนแสดงผล
+const errText = (e) => (hasKey('err.' + e.message) ? t('err.' + e.message) : e.message);
+function applyStatic(root = document) {
+  root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
+  root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+}
+// เปิดมาเป็นภาษาอังกฤษเสมอ เว้นแต่ลิงก์ระบุภาษาไว้ เช่น #lang=th
+function detectLang() {
+  const m = /lang=([a-z]{2})/.exec(location.hash);
+  return m && HTML_LANG[m[1]] ? m[1] : 'en';
+}
+
+const IMG_EXT = new Set(['png', 'jpg', 'jpeg', 'jfif', 'webp', 'bmp', 'gif', 'avif', 'tga']);
+const MAX_SRC = 1024;   // ย่อรูปต้นฉบับใหญ่ ๆ เก็บไว้แค่นี้ ประหยัดหน่วยความจำ
+const flags = [];
+let nextId = 1;
+
+const listEl = $('#flags'), emptyEl = $('#empty'), statusEl = $('#status');
+const countEl = $('#count'), dlBtn = $('#download'), clearBtn = $('#clear'), bulkEl = $('#bulk');
+
+const extOf = (n) => { const i = n.lastIndexOf('.'); return i < 0 ? '' : n.slice(i + 1).toLowerCase(); };
+const cleanName = (s) => s.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\.tga$/i, '').trim();
+const IDEOLOGIES = ['', 'communism', 'democratic', 'fascism', 'neutrality'];
+function ideoOptions() {
+  return IDEOLOGIES.map((v) =>
+    `<option value="${v}">${v ? `_${v} (${t('ideo.' + v)})` : t('ideo.none')}</option>`).join('');
+}
+const IDEO_RE = /_(communism|democratic|fascism|neutrality)$/i;
+// "GER_fascism" -> { base: "GER", ideo: "fascism" }
+function splitName(s) {
+  const n = cleanName(s), m = n.match(IDEO_RE);
+  return m ? { base: n.slice(0, -m[0].length).trim(), ideo: m[1].toLowerCase() } : { base: n, ideo: '' };
+}
+// ชื่อไฟล์จริง: แท็ก + คำต่อท้าย (ถ้าพิมพ์คำต่อท้ายไว้ในช่องชื่อ ให้ใช้อันนั้นก่อน)
+function fullName(f) {
+  const p = splitName(f.input.value), ideo = p.ideo || f.ideo.value;
+  return p.base ? p.base + (ideo ? '_' + ideo : '') : '';
+}
+const currentMode = () => $('input[name=mode]:checked').value;
+const currentLayout = () => $('input[name=layout]:checked').value;
+
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function ctx2d(c) {
+  const x = c.getContext('2d');
+  x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+  return x;
+}
+function say(msg, isErr = false) { statusEl.textContent = msg; statusEl.classList.toggle('is-err', isErr); }
+
+// ย่อทีละครึ่ง รูปเล็กอย่าง 10×7 จะได้ไม่แตกเป็นจุด ๆ
+function halveUntil(c, tw, th) {
+  while (c.width > tw * 2 || c.height > th * 2) {
+    const nw = c.width > tw * 2 ? Math.ceil(c.width / 2) : c.width;
+    const nh = c.height > th * 2 ? Math.ceil(c.height / 2) : c.height;
+    const n = mk(nw, nh); ctx2d(n).drawImage(c, 0, 0, nw, nh); c = n;
+  }
+  return c;
+}
+function shrinkSource(c) {
+  while (Math.max(c.width, c.height) > MAX_SRC) {
+    const nw = Math.max(1, Math.round(c.width / 2)), nh = Math.max(1, Math.round(c.height / 2));
+    const n = mk(nw, nh); ctx2d(n).drawImage(c, 0, 0, nw, nh); c = n;
+  }
+  return c;
+}
+
+function renderInto(out, src, how) {
+  const W = out.width, H = out.height, SW = src.width, SH = src.height;
+  let sx = 0, sy = 0, sw = SW, sh = SH, dx = 0, dy = 0, dw = W, dh = H;
+  if (how === 'cover') {
+    const s = Math.max(W / SW, H / SH);
+    sw = Math.min(SW, W / s); sh = Math.min(SH, H / s);
+    sx = (SW - sw) / 2; sy = (SH - sh) / 2;
+  } else if (how === 'contain') {
+    const s = Math.min(W / SW, H / SH);
+    dw = Math.max(1, Math.min(W, Math.round(SW * s)));
+    dh = Math.max(1, Math.min(H, Math.round(SH * s)));
+    dx = Math.floor((W - dw) / 2); dy = Math.floor((H - dh) / 2);
+  }
+  let cur = src;
+  if (sx || sy || sw !== SW || sh !== SH) {
+    cur = mk(Math.max(1, Math.round(sw)), Math.max(1, Math.round(sh)));
+    ctx2d(cur).drawImage(src, sx, sy, sw, sh, 0, 0, cur.width, cur.height);
+  }
+  cur = halveUntil(cur, dw, dh);
+  const x = ctx2d(out);
+  x.clearRect(0, 0, W, H);
+  x.drawImage(cur, dx, dy, dw, dh);
+}
+
+function viaImg(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('imgRead')); };
+    img.src = url;
+  });
+}
+async function loadImage(file) {
+  let c;
+  if (extOf(file.name) === 'tga') {
+    const t = decodeTGA(new Uint8Array(await file.arrayBuffer()));
+    c = mk(t.w, t.h);
+    c.getContext('2d').putImageData(new ImageData(t.data, t.w, t.h), 0, 0);
+  } else {
+    let img;
+    try { img = await createImageBitmap(file); } catch { img = await viaImg(file); }
+    const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    if (!w || !h) throw new Error('imgSize');
+    c = mk(w, h);
+    c.getContext('2d').drawImage(img, 0, 0);
+    if (img.close) img.close();
+  }
+  return { canvas: shrinkSource(c), w: c.width, h: c.height };
+}
+
+// ---------- เลเยอร์ ----------
+// พื้นที่ทำงาน = ธงใหญ่ 82×52 ขยาย 10 เท่า วาดทุกเลเยอร์ลงที่นี่ก่อน แล้วค่อยย่อเป็น 3 ขนาด
+const CW = 820, CH = 520, MIN_SIZE = 6;
+let layerSeq = 1;
+const baseName = (n) => n.replace(/\.[^.]+$/, '') || '';
+
+function makeImageLayer(src, name) {
+  return { id: layerSeq++, type: 'image', name, src, x: CW / 2, y: CH / 2, w: CW, h: CH,
+    rot: 0, flipX: false, flipY: false, opacity: 1, visible: true, lock: true };
+}
+function makeShapeLayer(type, n) {
+  const base = type === 'rect'
+    ? { w: CW, h: CH / 3, color: '#ffffff', lock: false }
+    : { w: CH / 2, h: CH / 2, color: '#c8102e', lock: true };
+  return { id: layerSeq++, type, name: '', num: n, x: CW / 2, y: CH / 2, rot: 0, flipX: false, flipY: false,
+    opacity: 1, visible: true, ...base };
+}
+// ชื่อเลเยอร์แปลตามภาษาที่เลือก (รูปใช้ชื่อไฟล์, รูปทรงใช้ชื่อ + ลำดับ)
+function layerName(L) {
+  const base = L.type === 'rect' ? t('ed.rectName', { n: L.num })
+    : L.type === 'ellipse' ? t('ed.ellipseName', { n: L.num })
+    : (L.name || t('img.default'));
+  return L.copy ? `${base} ${t('ed.copy')}` : base;
+}
+// stretch = ยืดเต็มกรอบ, cover = ครอปให้เต็ม, contain = ย่อให้พอดี
+function fitLayer(L, how) {
+  const nw = L.type === 'image' ? L.src.width : L.w;
+  const nh = L.type === 'image' ? L.src.height : L.h;
+  L.x = CW / 2; L.y = CH / 2; L.rot = 0;
+  if (how === 'stretch') { L.w = CW; L.h = CH; return; }
+  const s = how === 'cover' ? Math.max(CW / nw, CH / nh) : Math.min(CW / nw, CH / nh);
+  L.w = nw * s; L.h = nh * s;
+}
+// รูปที่ถูกย่อมาก ๆ ให้ย่อทีละครึ่งก่อน ภาพจะได้ไม่แตก
+const scaledCache = new WeakMap();
+function srcFor(L, scale = 1) {
+  const s = L.src, tw = L.w * scale, th = L.h * scale;
+  if (s.width <= tw * 2 && s.height <= th * 2) return s;
+  const key = Math.round(tw) + 'x' + Math.round(th);
+  let m = scaledCache.get(s);
+  if (!m) { m = new Map(); scaledCache.set(s, m); }
+  if (m.has(key)) return m.get(key);
+  const c = halveUntil(s, tw, th);
+  m.set(key, c);
+  if (m.size > 4) m.delete(m.keys().next().value);
+  return c;
+}
+// scale = ขนาดที่วาดจริงต่อ 1 หน่วยธง (ใช้เลือกความละเอียดของรูปตอนซูม)
+function drawLayer(c, L, scale = 1) {
+  if (!L.visible || L.opacity <= 0) return;
+  c.save();
+  c.globalAlpha = L.opacity;
+  c.translate(L.x, L.y);
+  c.rotate(L.rot * Math.PI / 180);
+  c.scale(L.flipX ? -1 : 1, L.flipY ? -1 : 1);
+  if (L.type === 'image') {
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+    c.drawImage(srcFor(L, scale), -L.w / 2, -L.h / 2, L.w, L.h);
+  } else {
+    c.fillStyle = L.color;
+    c.beginPath();
+    if (L.type === 'rect') c.rect(-L.w / 2, -L.h / 2, L.w, L.h);
+    else c.ellipse(0, 0, L.w / 2, L.h / 2, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.restore();
+}
+function composite(layers) {
+  const c = mk(CW, CH), x = ctx2d(c);
+  for (const L of layers) drawLayer(x, L);
+  return c;
+}
+function renderOuts(outs, layers) {
+  const comp = composite(layers);
+  for (const s of SIZES) renderInto(outs[s.key], comp, 'stretch');
+}
+function buildPreviews(container) {
+  const outs = {};
+  for (const s of SIZES) {
+    const fig = document.createElement('figure');
+    fig.className = 'pv pv-' + s.key;
+    const box = document.createElement('div');
+    box.className = 'box';
+    const c = mk(s.w, s.h);
+    c.style.width = s.w * s.scale + 'px';
+    c.style.height = s.h * s.scale + 'px';
+    box.append(c);
+    const cap = document.createElement('figcaption');
+    cap.textContent = `${s.w}×${s.h}`;
+    fig.append(box, cap);
+    container.append(fig);
+    outs[s.key] = c;
+  }
+  return outs;
+}
+
+function renderFlag(f) {
+  // ธงที่ยังไม่ได้แก้ในหน้าแก้ไข ให้จัดรูปตามตัวเลือก "ถ้าสัดส่วนรูปไม่ตรงกับธง"
+  if (!f.edited) fitLayer(f.layers[0], currentMode());
+  renderOuts(f.outs, f.layers);
+}
+function updateBadge(f) {
+  const b = $('.edited', f.li);
+  b.hidden = !f.edited;
+  b.textContent = f.edited ? t('row.edited', { n: f.layers.length }) : '';
+}
+
+function addFlag(filename, img) {
+  const id = nextId++;
+  const li = document.createElement('li');
+  li.className = 'flag';
+  li.innerHTML = `
+    <div class="flag-name">
+      <div class="fields">
+        <div class="field">
+          <label for="name-${id}" data-i18n="row.tag"></label>
+          <input id="name-${id}" type="text" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="ideo-${id}" data-i18n="row.ideo"></label>
+          <select id="ideo-${id}" class="ideo-select">${ideoOptions()}</select>
+        </div>
+      </div>
+      <p class="out-name"><span data-i18n="row.out"></span> <strong></strong></p>
+      <p class="meta"></p>
+      <p class="edited" hidden></p>
+      <p class="err" hidden></p>
+    </div>
+    <div class="previews"></div>
+    <div class="row-actions">
+      <button type="button" class="btn btn-small edit" data-i18n="row.edit"></button>
+      <button type="button" class="btn btn-small remove" data-i18n="row.remove"></button>
+    </div>`;
+  applyStatic(li);
+  const input = $('input', li), ideo = $('select', li);
+  const parsed = splitName(filename.replace(/\.[^.]+$/, ''));
+  input.value = parsed.base;
+  ideo.value = parsed.ideo;
+
+  const outs = buildPreviews($('.previews', li));
+  const bname = baseName(filename);
+  const flag = { id, li, input, ideo, outs, filename, srcW: img.w, srcH: img.h, baseSrc: img.canvas, baseName: bname,
+    layers: [makeImageLayer(img.canvas, bname)], edited: false };
+  $('.edit', li).addEventListener('click', () => openEditor(flag));
+  input.addEventListener('input', refresh);
+  ideo.addEventListener('change', refresh);
+  // พิมพ์ GER_fascism ในช่องแท็ก -> แยกเป็น GER + เลือก fascism ให้
+  input.addEventListener('blur', () => {
+    const p = splitName(input.value);
+    let changed = false;
+    if (p.base !== input.value) { input.value = p.base; changed = true; }
+    if (p.ideo && p.ideo !== ideo.value) { ideo.value = p.ideo; changed = true; }
+    if (changed) refresh();
+  });
+  $('.remove', li).addEventListener('click', () => {
+    const n = fullName(flag);
+    flags.splice(flags.indexOf(flag), 1);
+    li.remove();
+    refresh();
+    say(t('st.removed', { name: n || t('row.unnamed') }));
+  });
+
+  flags.push(flag);
+  listEl.append(li);
+  renderFlag(flag);
+}
+
+async function addFiles(list) {
+  const files = [...list].filter((f) => IMG_EXT.has(extOf(f.name)) || f.type.startsWith('image/'));
+  if (!files.length) { say(t('st.noImages'), true); return; }
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  const failed = [];
+  let added = 0;
+  for (const [i, f] of files.entries()) {
+    say(t('st.reading', { i: i + 1, n: files.length }));
+    try { addFlag(f.name, await loadImage(f)); added++; }
+    catch (e) { failed.push(`${f.name} (${errText(e)})`); }
+  }
+  refresh();
+  if (failed.length) say(t('st.added', { n: added }) + t('st.failed', { list: failed.join(', ') }), true);
+  else say(t('st.added', { n: added }));
+}
+
+function refresh() {
+  const names = flags.map(fullName);
+  const counts = new Map();
+  for (const n of names) {
+    const k = n.toLowerCase();
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  let problems = 0;
+  flags.forEach((f, i) => {
+    const n = names[i];
+    let msg = '';
+    if (!n) msg = t('err.noName');
+    else if (counts.get(n.toLowerCase()) > 1) msg = t('err.dup');
+    $('.out-name strong', f.li).textContent = n ? n + '.tga' : t('row.noName');
+    $('.meta', f.li).textContent = t('row.from', { file: f.filename, w: f.srcW, h: f.srcH });
+    updateBadge(f);
+    const err = $('.err', f.li);
+    err.textContent = msg;
+    err.hidden = !msg;
+    f.li.classList.toggle('has-err', !!msg);
+    f.input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    $('.remove', f.li).setAttribute('aria-label', t('row.removeAria', { name: n || t('row.unnamed') }));
+    $('.edit', f.li).setAttribute('aria-label', t('row.editAria', { name: n || t('row.unnamed') }));
+    if (msg) problems++;
+  });
+  emptyEl.hidden = flags.length > 0;
+  bulkEl.hidden = flags.length === 0;
+  dlBtn.disabled = flags.length === 0 || problems > 0;
+  if (!flags.length) countEl.textContent = t('count.none');
+  else if (problems) countEl.textContent = t('count.problems', { n: problems });
+  else countEl.textContent = t('count.ready', { n: flags.length, files: flags.length * 3 });
+}
+
+dlBtn.addEventListener('click', () => {
+  refresh();
+  if (dlBtn.disabled) return;
+  const lay = currentLayout();
+  const files = [];
+  for (const f of flags) {
+    const n = fullName(f);
+    for (const s of SIZES) {
+      const c = f.outs[s.key];
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      const path = lay === 'mod' ? `gfx/flags/${s.sub}${n}.tga` : `${s.key}/${n}.tga`;
+      files.push({ name: path, data: rgbaToTGA(c.width, c.height, d) });
+    }
+  }
+  const url = URL.createObjectURL(makeZip(files));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'hoi4_flags.zip';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  say(t('st.downloaded', { n: files.length }));
+});
+
+$('#bulk-apply').addEventListener('click', () => {
+  const v = $('#bulk-ideo').value;
+  for (const f of flags) {
+    f.input.value = splitName(f.input.value).base;
+    f.ideo.value = v;
+  }
+  refresh();
+  say(v ? t('st.bulkSet', { v }) : t('st.bulkNone'));
+});
+
+clearBtn.addEventListener('click', () => {
+  flags.length = 0;
+  listEl.replaceChildren();
+  refresh();
+  say(t('st.cleared'));
+});
+
+$('#btn-files').addEventListener('click', () => $('#pick-files').click());
+$('#btn-folder').addEventListener('click', () => $('#pick-folder').click());
+$('#pick-files').addEventListener('change', (e) => {
+  const fs = [...e.target.files];
+  e.target.value = '';
+  addFiles(fs);
+});
+// ข้ามโฟลเดอร์ย่อย medium / small เผื่อเลือกโฟลเดอร์ gfx/flags ของ mod เดิม
+const inSizeFolder = (p) => p.split('/').slice(1, -1).some((d) => /^(medium|small)$/i.test(d));
+$('#pick-folder').addEventListener('change', (e) => {
+  const fs = [...e.target.files].filter((f) => !inSizeFolder(f.webkitRelativePath || ''));
+  e.target.value = '';
+  addFiles(fs);
+});
+
+document.querySelectorAll('input[name=mode]').forEach((r) =>
+  r.addEventListener('change', () => flags.forEach(renderFlag)));
+
+document.addEventListener('paste', (e) => {
+  const fs = [...(e.clipboardData?.files || [])];
+  if (!fs.length) return;
+  e.preventDefault();
+  if (dlg.open) addLayersFromFiles(fs); else addFiles(fs);
+});
+
+const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+let dragDepth = 0;
+addEventListener('dragenter', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth++; document.body.classList.add('dragging');
+});
+addEventListener('dragleave', (e) => {
+  if (!hasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) document.body.classList.remove('dragging');
+});
+addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+addEventListener('drop', (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+  if (dlg.open) addLayersFromFiles(e.dataTransfer.files); else addFiles(e.dataTransfer.files);
+});
+
+// ---------- หน้าแก้ไขเลเยอร์ ----------
+const dlg = $('#editor'), stage = $('#ed-stage'), sctx = stage.getContext('2d');
+const PAD = 150;   // ขอบรอบกรอบธง ให้จับจุดปรับขนาดที่ล้นออกนอกธงได้
+const SW = CW + PAD * 2, SH = CH + PAD * 2;   // พื้นที่จัดวางตอนพอดีจอ (หน่วยเดียวกับธง)
+const RES = Math.min(2, Math.max(1, window.devicePixelRatio || 1));   // จอความละเอียดสูงวาดละเอียดขึ้น
+stage.width = Math.round(SW * RES);
+stage.height = Math.round(SH * RES);
+// มุมมอง: z = ระดับซูม (1 = พอดีจอ), cx/cy = จุดในธงที่อยู่กลางจอ
+const ZOOM_MIN = 0.1, ZOOM_MAX = 16;   // ซูมออกได้ถึง 10% ซูมเข้าได้ถึง 1600%
+const view = { z: 1, cx: CW / 2, cy: CH / 2 };
+let spaceHeld = false;
+const touches = new Map();
+const ed = { flag: null, layers: [], sel: null, hist: [], hi: -1, cleanAt: -1,
+  drag: null, guides: [], raf: 0, nudge: 0 };
+const edOuts = buildPreviews($('#ed-previews'));
+const checker = (() => {
+  const t = mk(20, 20), x = t.getContext('2d');
+  x.fillStyle = '#3a4a4d'; x.fillRect(0, 0, 20, 20);
+  x.fillStyle = '#2c393c'; x.fillRect(0, 0, 10, 10); x.fillRect(10, 10, 10, 10);
+  return sctx.createPattern(t, 'repeat');
+})();
+const ICON = {
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><path d="M4 4l16 16"/>',
+  up: '<path d="M6 15l6-6 6 6"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+};
+
+const selLayer = () => ed.layers.find((l) => l.id === ed.sel) || null;
+const rad = (d) => d * Math.PI / 180;
+const normDeg = (r) => Math.round(((((r + 180) % 360) + 360) % 360 - 180) * 10) / 10;
+function edSay(msg, isErr = false) {
+  const el = $('#ed-status');
+  el.textContent = msg;
+  el.classList.toggle('is-err', isErr);
+}
+
+// ---- ประวัติ (ย้อนกลับ / ทำซ้ำ) ----
+function commit() {
+  clearTimeout(ed.nudge); ed.nudge = 0;
+  ed.hist = ed.hist.slice(0, ed.hi + 1);
+  ed.hist.push({ layers: ed.layers.map((l) => ({ ...l })), sel: ed.sel });
+  if (ed.hist.length > 80) { ed.hist.shift(); ed.cleanAt--; }
+  ed.hi = ed.hist.length - 1;
+  updateUndo();
+}
+function restoreAt(i) {
+  ed.hi = i;
+  const snap = ed.hist[i];
+  ed.layers = snap.layers.map((l) => ({ ...l }));
+  ed.sel = ed.layers.some((l) => l.id === snap.sel) ? snap.sel : null;
+  syncPanels(); draw();
+}
+function flushNudge() { if (ed.nudge) commit(); }
+function undo() { flushNudge(); if (ed.hi > 0) restoreAt(ed.hi - 1); }
+function redo() { flushNudge(); if (ed.hi < ed.hist.length - 1) restoreAt(ed.hi + 1); }
+function updateUndo() {
+  $('#ed-undo').disabled = ed.hi <= 0;
+  $('#ed-redo').disabled = ed.hi >= ed.hist.length - 1;
+}
+
+// ---- เรขาคณิต ----
+function toLocal(L, px, py) {
+  const a = -rad(L.rot), dx = px - L.x, dy = py - L.y;
+  return { x: dx * Math.cos(a) - dy * Math.sin(a), y: dx * Math.sin(a) + dy * Math.cos(a) };
+}
+function toWorld(L, lx, ly) {
+  const a = rad(L.rot);
+  return { x: L.x + lx * Math.cos(a) - ly * Math.sin(a), y: L.y + lx * Math.sin(a) + ly * Math.cos(a) };
+}
+// ตำแหน่งบนจอ -> พิกัดพื้นที่จัดวางตอนพอดีจอ (s = หน่วยต่อ 1 พิกเซลจอ)
+function screenToBase(clientX, clientY) {
+  const r = stage.getBoundingClientRect(), s = SW / (r.width || SW);
+  return { sx: (clientX - r.left) * s, sy: (clientY - r.top) * s, s };
+}
+// ตำแหน่งเมาส์ในพิกัดของธง (k = หน่วยธงต่อ 1 พิกเซลจอ ใช้ให้จุดจับมีขนาดคงที่ไม่ว่าจะซูมเท่าไร)
+function pointer(e) {
+  const b = screenToBase(e.clientX, e.clientY);
+  return { x: (b.sx - SW / 2) / view.z + view.cx, y: (b.sy - SH / 2) / view.z + view.cy,
+    k: b.s / view.z, touch: e.pointerType === 'touch' };
+}
+function clampView() {
+  view.z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.z));
+  view.cx = Math.min(CW + PAD, Math.max(-PAD, view.cx));
+  view.cy = Math.min(CH + PAD, Math.max(-PAD, view.cy));
+}
+function updateZoomUI() {
+  $('#ed-zoom-pct').textContent = Math.round(view.z * 100) + '%';
+  $('#ed-zoom-out').disabled = view.z <= ZOOM_MIN + 1e-6;
+  $('#ed-zoom-in').disabled = view.z >= ZOOM_MAX - 1e-6;
+}
+// ซูมโดยให้จุดใต้เมาส์ (sx, sy) อยู่ที่เดิม
+function zoomAt(factor, sx = SW / 2, sy = SH / 2) {
+  const wx = (sx - SW / 2) / view.z + view.cx, wy = (sy - SH / 2) / view.z + view.cy;
+  view.z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.z * factor));
+  view.cx = wx - (sx - SW / 2) / view.z;
+  view.cy = wy - (sy - SH / 2) / view.z;
+  clampView(); updateZoomUI(); draw();
+}
+function fitView() {
+  view.z = 1; view.cx = CW / 2; view.cy = CH / 2;
+  updateZoomUI(); draw();
+}
+$('#ed-zoom-in').addEventListener('click', () => zoomAt(1.25));
+$('#ed-zoom-out').addEventListener('click', () => zoomAt(0.8));
+$('#ed-zoom-fit').addEventListener('click', fitView);
+const HANDLES = [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
+function handlePoints(L, k) {
+  const pts = HANDLES.map(([hx, hy]) => ({ hx, hy, ...toWorld(L, hx * L.w / 2, hy * L.h / 2) }));
+  pts.push({ rot: true, ...toWorld(L, 0, -L.h / 2 - 30 * k) });
+  return pts;
+}
+function hitHandle(L, p) {
+  const r = (p.touch ? 16 : 9) * p.k;
+  let best = null, bd = Infinity;
+  for (const h of handlePoints(L, p.k)) {
+    const d = Math.hypot(h.x - p.x, h.y - p.y);
+    if (d <= r && d < bd) { best = h; bd = d; }
+  }
+  return best;
+}
+function hitLayer(p) {
+  for (let i = ed.layers.length - 1; i >= 0; i--) {
+    const L = ed.layers[i];
+    if (!L.visible) continue;
+    const q = toLocal(L, p.x, p.y);
+    if (Math.abs(q.x) <= L.w / 2 && Math.abs(q.y) <= L.h / 2) return L;
+  }
+  return null;
+}
+const CURSORS = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'];
+function cursorFor(h, L) {
+  if (h.rot) return 'grab';
+  const a = ((Math.atan2(h.hy, h.hx) * 180 / Math.PI + L.rot) % 180 + 180) % 180;
+  return CURSORS[Math.round(a / 45) % 4];
+}
+
+// ---- ลาก ย้าย ย่อขยาย หมุน ----
+function snapAxis(v, half, lines, t) {
+  let best = null;
+  const offs = half == null ? [0] : [0, -half, half];
+  for (const g of lines) {
+    for (const o of offs) {
+      const c = g - o, dist = Math.abs(v - c);
+      if (dist <= t && (!best || dist < best.dist)) best = { v: c, at: g, dist };
+    }
+  }
+  return best;
+}
+function moveLayer(L, d, p, free) {
+  let x = d.start.x + p.x - d.p0.x, y = d.start.y + p.y - d.p0.y;
+  ed.guides = [];
+  if (!free) {
+    // ดูดเข้าแนวกลางธง และถ้าไม่ได้หมุนเอียง ให้ขอบรูปดูดเข้าขอบธงด้วย
+    const square = Math.abs((((L.rot % 90) + 90) % 90)) < 0.01;
+    const side = square && Math.abs((((L.rot % 180) + 180) % 180) - 90) < 0.01;
+    const hw = square ? (side ? L.h : L.w) / 2 : null;
+    const hh = square ? (side ? L.w : L.h) / 2 : null;
+    const t = 8 * p.k;
+    const sx = snapAxis(x, hw, [0, CW / 2, CW], t), sy = snapAxis(y, hh, [0, CH / 2, CH], t);
+    if (sx) { x = sx.v; ed.guides.push({ axis: 'x', at: sx.at }); }
+    if (sy) { y = sy.v; ed.guides.push({ axis: 'y', at: sy.at }); }
+  }
+  L.x = x; L.y = y;
+}
+function resizeLayer(L, d, p, shift) {
+  const s = d.start, hx = d.h.hx, hy = d.h.hy;
+  const q = toLocal(s, p.x, p.y);
+  const ax = -hx * s.w / 2, ay = -hy * s.h / 2;   // จุดฝั่งตรงข้ามที่อยู่กับที่
+  let w = s.w, h = s.h;
+  if (hx) w = Math.max(MIN_SIZE, (q.x - ax) * hx);
+  if (hy) h = Math.max(MIN_SIZE, (q.y - ay) * hy);
+  if (s.lock !== shift) {
+    if (hx && hy) { const k = Math.max(w / s.w, h / s.h); w = s.w * k; h = s.h * k; }
+    else if (hx) h = s.h * (w / s.w);
+    else w = s.w * (h / s.h);
+  }
+  const c = toWorld(s, hx ? ax + hx * w / 2 : 0, hy ? ay + hy * h / 2 : 0);
+  L.x = c.x; L.y = c.y; L.w = w; L.h = h;
+}
+function rotateLayer(L, d, p, shift) {
+  const a = Math.atan2(p.y - d.start.y, p.x - d.start.x);
+  let r = d.start.rot + (a - d.a0) * 180 / Math.PI;
+  if (shift) r = Math.round(r / 15) * 15;
+  L.rot = normDeg(r);
+}
+
+// จับเมาส์/นิ้วไว้กับพื้นที่จัดวางระหว่างลาก (บางเบราว์เซอร์โยน error ถ้านิ้วยกไปแล้ว)
+function capture(id) { try { stage.setPointerCapture(id); } catch { /* ไม่เป็นไร */ } }
+function beginPan(e) {
+  ed.drag = { type: 'pan', b0: screenToBase(e.clientX, e.clientY), cx: view.cx, cy: view.cy };
+  capture(e.pointerId);
+  stage.style.cursor = 'grabbing';
+}
+// สองนิ้วบนจอสัมผัส = หนีบเพื่อซูม และเลื่อนไปพร้อมกัน
+function beginPinch() {
+  const d = ed.drag;
+  if (d && d.type !== 'pan' && d.moved) { const L = selLayer(); if (L) Object.assign(L, d.start); }
+  ed.drag = null; ed.guides = [];
+  const [a, b] = [...touches.values()];
+  ed.pinch = { d0: Math.hypot(a.sx - b.sx, a.sy - b.sy) || 1, mx: (a.sx + b.sx) / 2, my: (a.sy + b.sy) / 2,
+    z0: view.z, cx0: view.cx, cy0: view.cy };
+  syncProps(); draw();
+}
+function updatePinch() {
+  const [a, b] = [...touches.values()];
+  if (!b) return;
+  const P = ed.pinch;
+  const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, P.z0 * Math.hypot(a.sx - b.sx, a.sy - b.sy) / P.d0));
+  const wx = (P.mx - SW / 2) / P.z0 + P.cx0, wy = (P.my - SH / 2) / P.z0 + P.cy0;
+  view.z = z;
+  view.cx = wx - ((a.sx + b.sx) / 2 - SW / 2) / z;
+  view.cy = wy - ((a.sy + b.sy) / 2 - SH / 2) / z;
+  clampView(); updateZoomUI(); draw();
+}
+stage.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') {
+    touches.set(e.pointerId, screenToBase(e.clientX, e.clientY));
+    capture(e.pointerId);
+    if (touches.size >= 2) { beginPinch(); return; }
+  }
+  if (e.button === 1 || (e.button === 0 && spaceHeld)) { e.preventDefault(); beginPan(e); return; }
+  if (e.button !== 0) return;
+  flushNudge();
+  const p = pointer(e);
+  let L = selLayer();
+  const h = L && hitHandle(L, p);
+  if (!h) { L = hitLayer(p); ed.sel = L ? L.id : null; }
+  if (L) {
+    ed.drag = { type: h ? (h.rot ? 'rotate' : 'resize') : 'move', h, p0: p, start: { ...L },
+      a0: Math.atan2(p.y - L.y, p.x - L.x), moved: false };
+    capture(e.pointerId);
+    if (h && h.rot) stage.style.cursor = 'grabbing';
+  } else if (view.z > 1) {
+    beginPan(e);   // ลากพื้นที่ว่างตอนซูมอยู่ = เลื่อนมุมมอง
+  }
+  stage.focus({ preventScroll: true });
+  syncPanels(); draw();
+});
+stage.addEventListener('pointermove', (e) => {
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, screenToBase(e.clientX, e.clientY));
+  if (ed.pinch) { updatePinch(); return; }
+  const p = pointer(e), d = ed.drag;
+  if (d && d.type === 'pan') {
+    const b = screenToBase(e.clientX, e.clientY);
+    view.cx = d.cx - (b.sx - d.b0.sx) / view.z;
+    view.cy = d.cy - (b.sy - d.b0.sy) / view.z;
+    clampView(); draw();
+    return;
+  }
+  if (!d) {
+    const L = selLayer(), h = L && hitHandle(L, p);
+    stage.style.cursor = spaceHeld ? 'grab' : h ? cursorFor(h, L)
+      : hitLayer(p) ? 'move' : (view.z > 1 ? 'grab' : 'default');
+    return;
+  }
+  const L = selLayer();
+  if (!L) return;
+  d.moved = true;
+  if (d.type === 'move') moveLayer(L, d, p, e.altKey);
+  else if (d.type === 'resize') resizeLayer(L, d, p, e.shiftKey);
+  else rotateLayer(L, d, p, e.shiftKey);
+  syncProps(); draw();
+});
+function endDrag(e) {
+  if (e && touches.delete(e.pointerId) && touches.size < 2 && ed.pinch) {
+    ed.pinch = null;
+    return;
+  }
+  if (!ed.drag) return;
+  if (ed.drag.type !== 'pan' && ed.drag.moved) { commit(); renderLayerList(); }
+  ed.drag = null; ed.guides = [];
+  stage.style.cursor = spaceHeld ? 'grab' : 'default';
+  draw();
+}
+// Ctrl + ลูกกลิ้ง (หรือหนีบบนทัชแพด) = ซูม, ลูกกลิ้งเฉย ๆ ตอนซูมอยู่ = เลื่อนมุมมอง
+stage.addEventListener('wheel', (e) => {
+  const b = screenToBase(e.clientX, e.clientY);
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    zoomAt(Math.exp(-e.deltaY * unit * 0.0025), b.sx, b.sy);
+  } else if (view.z > 1) {
+    e.preventDefault();
+    const k = b.s / view.z;
+    view.cx += (e.shiftKey ? e.deltaY : e.deltaX) * unit * k;
+    view.cy += (e.shiftKey ? 0 : e.deltaY) * unit * k;
+    clampView(); draw();
+  }
+}, { passive: false });
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('lostpointercapture', endDrag);
+
+// ---- วาดพื้นที่จัดวาง ----
+function draw() { if (!ed.raf) ed.raf = requestAnimationFrame(paint); }
+function paint() {
+  ed.raf = 0;
+  if (!dlg.open) return;
+  const c = sctx, W = stage.width, H = stage.height, z = view.z;
+  const r = stage.getBoundingClientRect();
+  const k = (r.width ? SW / r.width : 1) / z;   // หน่วยธงต่อ 1 พิกเซลจอ
+  const scale = RES * z, BIG = 1e5;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = '#151d1f'; c.fillRect(0, 0, W, H);
+  c.setTransform(scale, 0, 0, scale, RES * (SW / 2 - view.cx * z), RES * (SH / 2 - view.cy * z));
+  if (checker.setTransform) checker.setTransform(new DOMMatrix([1 / z, 0, 0, 1 / z, 0, 0]));
+  c.fillStyle = checker; c.fillRect(0, 0, CW, CH);
+  for (const L of ed.layers) drawLayer(c, L, scale);
+  // ส่วนที่ล้นออกนอกธงจะถูกตัดทิ้งตอนส่งออก จึงทำให้มืดลง
+  c.beginPath(); c.rect(-BIG, -BIG, CW + BIG * 2, CH + BIG * 2); c.rect(0, 0, CW, CH);
+  c.fillStyle = 'rgba(21, 29, 31, .8)'; c.fill('evenodd');
+  // ซูมเข้าใกล้มากพอ แสดงเส้นตารางพิกเซลของธงใหญ่ (1 ช่อง = 1 พิกเซลในไฟล์ 82×52)
+  if (10 / k >= 9) {
+    c.beginPath();
+    for (let x = 10; x < CW; x += 10) { c.moveTo(x, 0); c.lineTo(x, CH); }
+    for (let y = 10; y < CH; y += 10) { c.moveTo(0, y); c.lineTo(CW, y); }
+    c.lineWidth = k; c.strokeStyle = 'rgba(230, 222, 198, .14)'; c.stroke();
+  }
+  c.lineWidth = 2 * k; c.strokeStyle = '#7f6a3a'; c.strokeRect(0, 0, CW, CH);
+  if (ed.guides.length) {
+    c.setLineDash([6 * k, 5 * k]); c.lineWidth = 1.5 * k; c.strokeStyle = '#c9a65b';
+    for (const g of ed.guides) {
+      c.beginPath();
+      if (g.axis === 'x') { c.moveTo(g.at, -BIG); c.lineTo(g.at, BIG); }
+      else { c.moveTo(-BIG, g.at); c.lineTo(BIG, g.at); }
+      c.stroke();
+    }
+    c.setLineDash([]);
+  }
+  const L = selLayer();
+  if (L) drawSelection(c, L, k);
+  renderOuts(edOuts, ed.layers);
+}
+function drawSelection(c, L, k) {
+  const pts = handlePoints(L, k);
+  c.lineWidth = 1.5 * k; c.strokeStyle = '#c9a65b';
+  c.beginPath();
+  [pts[0], pts[2], pts[4], pts[6]].forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y)));
+  c.closePath(); c.stroke();
+  c.beginPath(); c.moveTo(pts[1].x, pts[1].y); c.lineTo(pts[8].x, pts[8].y); c.stroke();
+  const s = 5 * k;
+  for (const q of pts) {
+    c.beginPath();
+    if (q.rot) c.arc(q.x, q.y, s * 1.3, 0, Math.PI * 2);
+    else c.rect(q.x - s, q.y - s, s * 2, s * 2);
+    c.fillStyle = '#1b2527'; c.fill(); c.stroke();
+  }
+}
+addEventListener('resize', draw);
+
+// ---- รายการเลเยอร์ ----
+function iconBtn(icon, label, onClick, disabled = false) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn-icon'; b.title = label;
+  b.setAttribute('aria-label', label);
+  b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>`;
+  b.disabled = disabled;
+  b.addEventListener('click', onClick);
+  return b;
+}
+function renderLayerList() {
+  const ol = $('#ed-layers');
+  ol.replaceChildren();
+  for (let i = ed.layers.length - 1; i >= 0; i--) {
+    const L = ed.layers[i];
+    const li = document.createElement('li');
+    li.className = 'layer' + (L.id === ed.sel ? ' is-sel' : '') + (L.visible ? '' : ' is-hidden');
+    const pick = document.createElement('button');
+    pick.type = 'button'; pick.className = 'layer-pick';
+    pick.setAttribute('aria-pressed', L.id === ed.sel ? 'true' : 'false');
+    const th = mk(55, 35), tx = th.getContext('2d');
+    tx.scale(th.width / CW, th.height / CH);
+    drawLayer(tx, { ...L, visible: true, opacity: Math.max(L.opacity, .35) });
+    const nm = document.createElement('span');
+    nm.textContent = layerName(L);
+    pick.append(th, nm);
+    pick.addEventListener('click', () => { flushNudge(); ed.sel = L.id; syncPanels(); draw(); });
+    const tools = document.createElement('span');
+    tools.className = 'layer-tools';
+    tools.append(
+      iconBtn(L.visible ? ICON.eye : ICON.eyeOff, t(L.visible ? 'ed.hide' : 'ed.show', { name: layerName(L) }), () => {
+        L.visible = !L.visible; commit(); syncPanels(); draw();
+      }),
+      iconBtn(ICON.up, t('ed.up', { name: layerName(L) }), () => reorder(L, 1), i === ed.layers.length - 1),
+      iconBtn(ICON.down, t('ed.down', { name: layerName(L) }), () => reorder(L, -1), i === 0),
+    );
+    li.append(pick, tools);
+    ol.append(li);
+  }
+  if (!ed.layers.length) {
+    const li = document.createElement('li');
+    li.className = 'layer';
+    const p = document.createElement('p');
+    p.className = 'hint'; p.style.cssText = 'padding:10px 12px;margin:0';
+    p.textContent = t('ed.noLayers');
+    li.append(p);
+    ol.append(li);
+  }
+}
+function reorder(L, dir) {
+  const i = ed.layers.indexOf(L), j = i + dir;
+  if (j < 0 || j >= ed.layers.length) return;
+  [ed.layers[i], ed.layers[j]] = [ed.layers[j], ed.layers[i]];
+  commit(); syncPanels(); draw();
+}
+
+// ---- แผงปรับค่า ----
+function setVal(sel, v) {
+  const el = $(sel);
+  if (document.activeElement !== el) el.value = String(Math.round(v * 10) / 10);
+}
+function syncProps() {
+  const L = selLayer();
+  $('#ed-noselect').hidden = !!L;
+  $('#ed-propfields').hidden = !L;
+  if (!L) return;
+  $('#ed-sel-name').textContent = layerName(L);
+  setVal('#ed-x', L.x / CW * 100); setVal('#ed-y', L.y / CH * 100);
+  setVal('#ed-w', L.w / CW * 100); setVal('#ed-h', L.h / CH * 100);
+  setVal('#ed-rot', L.rot);
+  $('#ed-op').value = Math.round(L.opacity * 100);
+  $('#ed-op-out').textContent = Math.round(L.opacity * 100) + '%';
+  $('#ed-lock').checked = L.lock;
+  $('#ed-color-field').hidden = L.type === 'image';
+  if (L.type !== 'image') $('#ed-color').value = L.color;
+}
+function syncPanels() { renderLayerList(); syncProps(); updateUndo(); }
+
+function bindNumber(sel, apply) {
+  const el = $(sel);
+  el.addEventListener('input', () => {
+    const L = selLayer(), v = parseFloat(el.value);
+    if (!L || !Number.isFinite(v)) return;
+    flushNudge(); apply(L, v); syncProps(); draw();
+  });
+  el.addEventListener('change', () => { if (selLayer()) { commit(); syncPanels(); } });
+}
+bindNumber('#ed-x', (L, v) => { L.x = v / 100 * CW; });
+bindNumber('#ed-y', (L, v) => { L.y = v / 100 * CH; });
+bindNumber('#ed-w', (L, v) => { const w = Math.max(MIN_SIZE, v / 100 * CW); if (L.lock) L.h *= w / L.w; L.w = w; });
+bindNumber('#ed-h', (L, v) => { const h = Math.max(MIN_SIZE, v / 100 * CH); if (L.lock) L.w *= h / L.h; L.h = h; });
+bindNumber('#ed-rot', (L, v) => { L.rot = normDeg(v); });
+$('#ed-op').addEventListener('input', (e) => {
+  const L = selLayer(); if (!L) return;
+  L.opacity = e.target.value / 100;
+  $('#ed-op-out').textContent = e.target.value + '%';
+  draw();
+});
+$('#ed-op').addEventListener('change', () => { if (selLayer()) { commit(); renderLayerList(); } });
+$('#ed-color').addEventListener('input', (e) => { const L = selLayer(); if (L) { L.color = e.target.value; draw(); } });
+$('#ed-color').addEventListener('change', () => { if (selLayer()) { commit(); renderLayerList(); } });
+$('#ed-lock').addEventListener('change', (e) => { const L = selLayer(); if (L) { L.lock = e.target.checked; commit(); } });
+
+function editSel(fn, msg) {
+  const L = selLayer(); if (!L) return;
+  flushNudge(); fn(L); commit(); syncPanels(); draw();
+  if (msg) edSay(msg);
+}
+document.querySelectorAll('[data-fit]').forEach((b) => b.addEventListener('click', () => {
+  const how = b.dataset.fit;
+  editSel((L) => { if (how === 'center') { L.x = CW / 2; L.y = CH / 2; } else fitLayer(L, how); });
+}));
+$('#ed-flipx').addEventListener('click', () => editSel((L) => { L.flipX = !L.flipX; }));
+$('#ed-flipy').addEventListener('click', () => editSel((L) => { L.flipY = !L.flipY; }));
+
+function addLayer(L) {
+  flushNudge();
+  ed.layers.push(L); ed.sel = L.id;
+  commit(); syncPanels(); draw();
+}
+function duplicateSel() {
+  const L = selLayer(); if (!L) return;
+  flushNudge();
+  const copy = { ...L, id: layerSeq++, copy: (L.copy || 0) + 1, x: L.x + 20, y: L.y + 20 };
+  ed.layers.splice(ed.layers.indexOf(L) + 1, 0, copy);
+  ed.sel = copy.id;
+  commit(); syncPanels(); draw();
+  edSay(t('ed.dupDone', { name: layerName(L) }));
+}
+function deleteSel() {
+  const L = selLayer(); if (!L) return;
+  flushNudge();
+  const i = ed.layers.indexOf(L);
+  ed.layers.splice(i, 1);
+  const next = ed.layers[Math.max(0, i - 1)];
+  ed.sel = next ? next.id : null;
+  commit(); syncPanels(); draw();
+  edSay(t('ed.delDone', { name: layerName(L) }));
+}
+$('#ed-dup').addEventListener('click', duplicateSel);
+$('#ed-del').addEventListener('click', deleteSel);
+$('#ed-add-rect').addEventListener('click', () =>
+  addLayer(makeShapeLayer('rect', ed.layers.filter((l) => l.type === 'rect').length + 1)));
+$('#ed-add-ellipse').addEventListener('click', () =>
+  addLayer(makeShapeLayer('ellipse', ed.layers.filter((l) => l.type === 'ellipse').length + 1)));
+$('#ed-add-img').addEventListener('click', () => $('#ed-pick').click());
+$('#ed-pick').addEventListener('change', (e) => {
+  const fs = [...e.target.files];
+  e.target.value = '';
+  addLayersFromFiles(fs);
+});
+// รูปที่เพิ่มเป็นเลเยอร์ใหม่ จะย่อให้พอดีแล้วเหลือ 60% วางกลางธง เหมาะกับตราสัญลักษณ์
+async function addLayersFromFiles(list) {
+  const files = [...list].filter((f) => IMG_EXT.has(extOf(f.name)) || f.type.startsWith('image/'));
+  if (!files.length) { edSay(t('st.noImages'), true); return; }
+  flushNudge();
+  const failed = [];
+  let added = 0;
+  for (const f of files) {
+    try {
+      const img = await loadImage(f);
+      const L = makeImageLayer(img.canvas, baseName(f.name));
+      fitLayer(L, 'contain');
+      L.w *= .6; L.h *= .6;
+      ed.layers.push(L); ed.sel = L.id; added++;
+    } catch (err) { failed.push(`${f.name} (${errText(err)})`); }
+  }
+  if (added) { commit(); syncPanels(); draw(); }
+  if (failed.length) edSay(t('ed.added', { n: added }) + t('st.failed', { list: failed.join(', ') }), true);
+  else edSay(t('ed.added', { n: added }));
+}
+$('#ed-undo').addEventListener('click', undo);
+$('#ed-redo').addEventListener('click', redo);
+$('#ed-reset').addEventListener('click', () => {
+  const f = ed.flag; if (!f) return;
+  flushNudge();
+  const L = makeImageLayer(f.baseSrc, f.baseName);
+  fitLayer(L, currentMode());
+  ed.layers = [L]; ed.sel = L.id;
+  commit(); ed.cleanAt = ed.hi;
+  syncPanels(); draw();
+  edSay(t('ed.resetDone'));
+});
+
+// ---- คีย์ลัด ----
+dlg.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
+  if (mod && (e.key === '=' || e.key === '+')) { e.preventDefault(); zoomAt(1.25); return; }
+  if (mod && (e.key === '-' || e.key === '_')) { e.preventDefault(); zoomAt(0.8); return; }
+  if (mod && e.key === '0') { e.preventDefault(); fitView(); return; }
+  if (e.key === ' ' && !e.target.matches('input, select, textarea, button')) {
+    e.preventDefault();
+    if (!spaceHeld) { spaceHeld = true; if (!ed.drag) stage.style.cursor = 'grab'; }
+    return;
+  }
+  const textEntry = e.target.matches('input[type=number], input[type=text], select, textarea');
+  const inForm = e.target.matches('input, select, textarea');
+  if (mod && (key === 'z' || key === 'y')) {
+    if (textEntry) return;
+    e.preventDefault();
+    if (key === 'y' || e.shiftKey) redo(); else undo();
+    return;
+  }
+  if (inForm) return;
+  if (mod && key === 'd') { e.preventDefault(); duplicateSel(); return; }
+  if (e.key === 'Delete') { e.preventDefault(); deleteSel(); return; }
+  const L = selLayer();
+  const step = e.shiftKey ? 50 : 10;   // 10 หน่วย = 1 พิกเซลของธงใหญ่
+  const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (L && mv && !e.target.matches('button')) {
+    e.preventDefault();
+    L.x += mv[0]; L.y += mv[1];
+    syncProps(); draw();
+    clearTimeout(ed.nudge);
+    ed.nudge = setTimeout(() => { commit(); renderLayerList(); }, 400);
+  }
+});
+
+dlg.addEventListener('keyup', (e) => {
+  if (e.key === ' ' && spaceHeld) { spaceHeld = false; if (!ed.drag) stage.style.cursor = 'default'; }
+});
+addEventListener('blur', () => { spaceHeld = false; });
+
+// ---- เปิด / บันทึก / ปิด ----
+function openEditor(f) {
+  ed.flag = f;
+  ed.layers = f.layers.map((l) => ({ ...l }));
+  ed.sel = ed.layers.length ? ed.layers[ed.layers.length - 1].id : null;
+  ed.hist = []; ed.hi = -1; ed.cleanAt = -1; ed.drag = null; ed.pinch = null; ed.guides = [];
+  touches.clear(); spaceHeld = false;
+  view.z = 1; view.cx = CW / 2; view.cy = CH / 2; updateZoomUI();
+  commit();
+  $('#ed-title').textContent = t('ed.title', { name: fullName(f) ? fullName(f) + '.tga' : t('row.unnamed') });
+  edSay('');
+  dlg.showModal();
+  syncPanels(); draw();
+  stage.focus({ preventScroll: true });
+}
+$('#ed-save').addEventListener('click', () => {
+  flushNudge();
+  const f = ed.flag;
+  if (f) {
+    const name = fullName(f) || t('row.unnamed');
+    if (ed.hi === ed.cleanAt) {
+      // กดเริ่มใหม่แล้วไม่ได้แก้อะไรต่อ = กลับไปจัดรูปตามตัวเลือกด้านบนเหมือนเดิม
+      f.layers = [makeImageLayer(f.baseSrc, f.baseName)];
+      f.edited = false;
+      renderFlag(f); updateBadge(f);
+      say(t('st.resetSaved', { name }));
+    } else if (ed.hi > 0) {
+      f.layers = ed.layers.map((l) => ({ ...l }));
+      f.edited = true;
+      renderFlag(f); updateBadge(f);
+      say(t('st.saved', { name }));
+    }
+  }
+  dlg.close();
+});
+$('#ed-cancel').addEventListener('click', () => dlg.close());
+$('#ed-close').addEventListener('click', () => dlg.close());
+dlg.addEventListener('close', () => {
+  clearTimeout(ed.nudge); ed.nudge = 0;
+  ed.flag = null; ed.drag = null;
+});
+
+// ---------- เปลี่ยนภาษา ----------
+const langSel = $('#lang-select');
+langSel.innerHTML = LANGS.map(([c, name, h]) => `<option value="${c}" lang="${h}">${name}</option>`).join('');
+langSel.addEventListener('change', () => setLang(langSel.value));
+function setLang(code) {
+  lang = HTML_LANG[code] ? code : 'en';
+  document.documentElement.lang = HTML_LANG[lang];
+  document.title = t('title');
+  applyStatic(document);
+  $('#ed-close').title = t('ed.close');
+  document.querySelectorAll('select.ideo-select').forEach((sel) => {
+    const v = sel.value;
+    sel.innerHTML = ideoOptions();
+    sel.value = v;
+  });
+  langSel.value = lang;
+  say('');
+  refresh();
+  // จำภาษาไว้ในลิงก์ (#lang=en) บุ๊กมาร์กไว้แล้วเปิดใหม่จะได้ภาษาเดิม
+  try { history.replaceState(null, '', '#lang=' + lang); } catch { /* บางที่ห้ามแก้ลิงก์ ไม่เป็นไร */ }
+}
+addEventListener('hashchange', () => setLang(detectLang()));
+setLang(detectLang());
+</script>
+</body>
+</html>
